@@ -204,13 +204,29 @@ function showError(element, text) {
 }
 
 function showAuthScreen() {
-  document.getElementById('authScreen').classList.add('active');
-  document.getElementById('mainScreen').classList.add('hidden');
+  const auth = document.getElementById('authScreen');
+  const main = document.getElementById('mainScreen');
+  if (auth) {
+    auth.classList.add('active');
+    auth.classList.remove('hidden');
+  }
+  if (main) {
+    main.classList.remove('active');
+    main.classList.add('hidden');
+  }
 }
 
 function showMainScreen() {
-  document.getElementById('authScreen').classList.remove('active');
-  document.getElementById('mainScreen').classList.remove('hidden');
+  const auth = document.getElementById('authScreen');
+  const main = document.getElementById('mainScreen');
+  if (auth) {
+    auth.classList.remove('active');
+    auth.classList.add('hidden');
+  }
+  if (main) {
+    main.classList.add('active');
+    main.classList.remove('hidden');
+  }
 
   auditPastDaysPenalties();
   renderUserProfile();
