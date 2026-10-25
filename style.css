@@ -560,15 +560,215 @@ body {
 
 .slot-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.timeline-exercise-sub {
+  font-size: 11px;
+  color: #a5b4fc;
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.timeline-ex-badge {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.timeline-penalty-badge {
+  font-size: 10px;
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  font-weight: 700;
+}
+
 .slot-category-name {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.top-avatar-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: transform 0.15s;
+}
+
+.top-avatar-btn:active {
+  transform: scale(0.92);
+}
+
+.link-btn-small {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Slot exercises inputs inside modal */
+.slot-exercises-section {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-top: 4px;
+}
+
+.slot-ex-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slot-ex-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.slot-ex-row input,
+.slot-ex-row select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  color: white;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.slot-ex-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-red);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* =========================================================
+   REPORT TAB STYLES
+   ========================================================= */
+.report-hero-card {
+  background: linear-gradient(135deg, #182033, #0f1524);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.report-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.period-toggle-group {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.period-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+.categories-report-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cat-report-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cat-report-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cat-progress-bg {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.cat-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s;
+}
+
+.exercise-report-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exercise-report-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.ex-rep-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.ex-rep-val {
+  font-weight: 800;
+  color: var(--accent-green);
 }
 
 .timeline-check {

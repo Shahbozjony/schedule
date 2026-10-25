@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -77,15 +77,18 @@
     <div id="mainScreen" class="screen hidden">
       <!-- Top App Bar -->
       <header class="top-bar">
-        <div class="user-greeting">
-          <div class="avatar" id="userAvatar">U</div>
+        <div class="user-greeting" onclick="openProfileModal()" style="cursor: pointer;" title="Открыть профиль и настройки">
+          <div class="avatar" id="userAvatar">S</div>
           <div>
             <div class="date-str" id="currentDateStr">25 октября, Воскресенье</div>
-            <div class="user-name-title">Привет, <span id="displayName">Атлет</span> 👋</div>
+            <div class="user-name-title">Привет, <span id="displayName">Шахбоз</span> 👋</div>
           </div>
         </div>
         <div class="top-bar-actions">
-          <div class="live-clock" id="liveClock">21:45</div>
+          <div class="live-clock" id="liveClock">23:55</div>
+          <button class="top-avatar-btn" onclick="openProfileModal()" title="Настройки аккаунта и Telegram">
+            ⚙️
+          </button>
         </div>
       </header>
 
@@ -227,62 +230,65 @@
           </div>
         </section>
 
-        <!-- TAB 4: PROFILE & SETTINGS (Аккаунт) -->
-        <section id="viewProfile" class="app-view hidden">
-          <div class="profile-card">
-            <div class="big-avatar" id="profileBigAvatar">U</div>
-            <h2 id="profileName">Пользователь</h2>
-            <div class="profile-username" id="profileUsername">@login</div>
-            <div class="member-since" id="memberSince">В системе с 2026 года</div>
-          </div>
-
-          <!-- Install on iPhone Helper Box -->
-          <div class="section-card pwa-install-box">
-            <div class="pwa-header">
-              <div class="apple-icon">📱</div>
-              <h4>Установка на экран iPhone</h4>
+        <!-- TAB 4: REPORTS (Отчет за весь период по категориям и упражнениям) -->
+        <section id="viewReport" class="app-view hidden">
+          <!-- Report Header & Period Filters -->
+          <div class="section-card report-hero-card">
+            <div class="report-hero-header">
+              <div>
+                <span class="badge-tag">Аналитика дисциплины</span>
+                <h2>Сводный отчет</h2>
+              </div>
+              <div class="period-toggle-group">
+                <button class="period-btn active" id="btnPeriodAll" onclick="setReportPeriod('all')">Всё время</button>
+                <button class="period-btn" id="btnPeriodMonth" onclick="setReportPeriod('month')">Месяц</button>
+                <button class="period-btn" id="btnPeriodWeek" onclick="setReportPeriod('week')">7 дней</button>
+              </div>
             </div>
-            <p class="pwa-text">Чтобы приложение открывалось как нативное без рамок Safari:</p>
-            <ol class="pwa-steps">
-              <li>Открой эту страницу в <b>Safari</b>.</li>
-              <li>Нажми значок <b>«Поделиться»</b> (квадрат со стрелкой вверх) внизу.</li>
-              <li>Выбери <b>«На экран "Домой"»</b> (Add to Home Screen).</li>
-            </ol>
+            <p class="card-desc" id="reportPeriodDesc">Показатели за весь период ведения системы</p>
           </div>
 
-          <!-- Account Actions -->
-          <div class="section-card account-actions-card">
-            <h3>Управление аккаунтом</h3>
-            
-            <button class="action-btn-row" onclick="exportDataBackup()">
-              <span>📥 Скачать резервную копию данных</span>
-              <span class="chevron">›</span>
-            </button>
-
-            <button class="action-btn-row" onclick="document.getElementById('importFileInput').click()">
-              <span>📤 Восстановить данные из файла</span>
-              <span class="chevron">›</span>
-            </button>
-            <input type="file" id="importFileInput" style="display: none" accept=".json" onchange="importDataBackup(event)">
-
-            <button class="action-btn-row logout-btn" onclick="handleLogout()">
-              <span>🚪 Выйти из аккаунта</span>
-              <span class="chevron">›</span>
-            </button>
-          </div>
-
-          <!-- DANGER ZONE: DELETE ACCOUNT -->
-          <div class="danger-zone-card">
-            <div class="danger-header">
-              <span class="danger-icon">⚠️</span>
-              <h4>Опасная зона</h4>
+          <!-- Big Stat Grid -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">💥</div>
+              <div class="stat-val text-green" id="repTotalReps">0</div>
+              <div class="stat-lbl">Всего повторений</div>
             </div>
-            <p class="danger-desc">
-              Удаление аккаунта <b>навсегда сотрет</b> все ваши данные: всё расписание, историю отжиманий и расчет штрафов. После этого войти будет невозможно — придется создавать новый аккаунт с чистого листа.
-            </p>
-            <button class="delete-account-btn" onclick="confirmDeleteAccount()">
-              Удалить аккаунт навсегда
-            </button>
+            <div class="stat-card">
+              <div class="stat-icon">⏱️</div>
+              <div class="stat-val text-yellow" id="repTotalPlank">0 сек</div>
+              <div class="stat-lbl">Время в планке</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📋</div>
+              <div class="stat-val" id="repTotalBlocksDone">0</div>
+              <div class="stat-lbl">Блоков закрыто</div>
+            </div>
+            <div class="stat-card penalty-stat-card">
+              <div class="stat-icon">💰</div>
+              <div class="stat-val text-red" id="repTotalPenalty">0 сум</div>
+              <div class="stat-lbl">Штрафов за период</div>
+            </div>
+          </div>
+
+          <!-- Categories Performance Section -->
+          <div class="section-card">
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 12px;">
+              <span class="section-title">Статистика по категориям</span>
+              <button class="add-slot-btn" onclick="openAddCategoryModal()">+ Категория</button>
+            </div>
+            <div class="categories-report-list" id="categoriesReportList">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+          <!-- Exercises Breakdown Section -->
+          <div class="section-card">
+            <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">Выполненные упражнения</h3>
+            <div class="exercise-report-list" id="exerciseReportList">
+              <!-- Rendered by JS -->
+            </div>
           </div>
         </section>
 
@@ -302,23 +308,23 @@
           <span class="tab-icon">💰</span>
           <span class="tab-label">Штрафы</span>
         </button>
-        <button class="nav-tab-item" onclick="switchView('viewProfile')">
-          <span class="tab-icon">👤</span>
-          <span class="tab-label">Аккаунт</span>
+        <button class="nav-tab-item" onclick="switchView('viewReport')">
+          <span class="tab-icon">📊</span>
+          <span class="tab-label">Отчет</span>
         </button>
       </nav>
     </div>
 
     <!-- MODAL: ADD/EDIT SCHEDULE BLOCK -->
     <div id="slotModal" class="modal-overlay hidden">
-      <div class="modal-sheet">
+      <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto;">
         <div class="modal-handle"></div>
         <h3 id="modalSlotTitle">Новый блок времени</h3>
         <form id="slotForm" onsubmit="saveScheduleSlot(event)">
           <input type="hidden" id="slotId">
           <div class="input-group">
             <label>Название дела / задачи</label>
-            <input type="text" id="slotName" placeholder="Например: Глубокая работа" required>
+            <input type="text" id="slotName" placeholder="Например: Тренировка и норма отжиманий" required>
           </div>
           <div class="input-row-2">
             <div class="input-group">
@@ -330,22 +336,166 @@
               <input type="time" id="slotEnd" required>
             </div>
           </div>
+          
+          <!-- Category Selector & Add New Category Button -->
           <div class="input-group">
-            <label>Категория / Цвет</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label style="margin-bottom: 0;">Категория / Цвет</label>
+              <button type="button" class="link-btn-small" onclick="openAddCategoryModal()">+ Новая категория</button>
+            </div>
             <select id="slotCategory">
-              <option value="routine">🌅 Утро / Рутина</option>
-              <option value="work">💼 Работа / Учеба</option>
-              <option value="sport">🥊 Спорт / Отжимания</option>
-              <option value="rest">🧘 Отдых / Обед</option>
-              <option value="sleep">🌙 Сон / Отбой</option>
+              <!-- Dynamically populated from currentUser.categories -->
             </select>
           </div>
+
+          <!-- Configurable Penalty per Block -->
+          <div class="input-group">
+            <label>Сумма штрафа при пропуске (сум)</label>
+            <input type="number" id="slotPenalty" min="0" step="500" placeholder="5000" value="5000" required>
+            <span style="font-size: 11px; color: var(--text-dim);">Укажите штраф в зависимости от важности дела</span>
+          </div>
+
+          <!-- Block Exercises & Targets Section (Отжимания, Планка и др.) -->
+          <div class="slot-exercises-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 700; color: #a5b4fc;">Упражнения блока (подходы / планка)</span>
+              <button type="button" class="add-slot-btn" onclick="addExerciseFieldToSlot()" style="padding: 4px 8px; font-size: 11px;">+ Добавить</button>
+            </div>
+            <div id="slotExercisesContainer" class="slot-ex-container">
+              <!-- Dynamic rows of exercises for this block -->
+            </div>
+          </div>
+
           <div class="modal-buttons">
             <button type="button" class="cancel-btn" onclick="closeSlotModal()">Отмена</button>
             <button type="submit" class="primary-btn">Сохранить</button>
           </div>
           <button type="button" id="deleteSlotBtn" class="delete-link-btn hidden" onclick="deleteCurrentSlot()">Удалить этот блок</button>
         </form>
+      </div>
+    </div>
+
+    <!-- MODAL: ADD CUSTOM CATEGORY -->
+    <div id="categoryModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3>Создать новую категорию</h3>
+        <p class="modal-sub">Придумай свою категорию для расписания и отчетов</p>
+        <form onsubmit="saveCustomCategory(event)">
+          <div class="input-group">
+            <label>Название категории</label>
+            <input type="text" id="newCatName" placeholder="Например: Бокс, Английский, Бизнес" required>
+          </div>
+          <div class="input-row-2">
+            <div class="input-group">
+              <label>Эмодзи / Иконка</label>
+              <input type="text" id="newCatEmoji" placeholder="🥊" maxlength="4" value="🎯" required>
+            </div>
+            <div class="input-group">
+              <label>Цвет индикатора</label>
+              <input type="color" id="newCatColor" value="#6366f1" style="height: 44px; padding: 4px; cursor: pointer;">
+            </div>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeCategoryModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Создать категорию</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: PROFILE, SETTINGS & TELEGRAM BOT INTEGRATION -->
+    <div id="profileModal" class="modal-overlay hidden">
+      <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto;">
+        <div class="modal-handle"></div>
+        <div class="profile-card" style="padding: 16px; margin-bottom: 12px;">
+          <div class="big-avatar" id="profileBigAvatar" style="width: 58px; height: 58px; font-size: 26px;">S</div>
+          <h2 id="profileName" style="font-size: 18px;">Шахбоз</h2>
+          <div class="profile-username" id="profileUsername">@shahboz</div>
+          <div class="member-since" id="memberSince">В системе с 2026 года</div>
+        </div>
+
+        <!-- TELEGRAM BOT & CLOUDFLARE INTEGRATION -->
+        <div class="section-card" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-color: rgba(56, 189, 248, 0.3);">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span style="font-size: 22px;">🤖</span>
+            <div>
+              <h4 style="font-size: 15px; font-weight: 700; color: #38bdf8;">Telegram-бот (Cloudflare)</h4>
+              <p style="font-size: 11px; color: var(--text-muted);">Отправка напоминаний о блоках и штрафах прямо в Telegram</p>
+            </div>
+          </div>
+          
+          <div class="input-group" style="margin-bottom: 10px;">
+            <label>Токен бота или Cloudflare Worker URL</label>
+            <input type="text" id="tgBotToken" placeholder="123456789:ABC... или https://bot.workers.dev/notify">
+          </div>
+
+          <div class="input-group" style="margin-bottom: 10px;">
+            <label>Ваш Telegram Chat ID</label>
+            <input type="text" id="tgChatId" placeholder="Например: 987654321">
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="tgNotifyBlocks" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+              Присылать напоминание в начале каждого блока
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="tgNotifyPenalties" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+              Присылать вечерний отчет по штрафам (в 22:00)
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="primary-btn" onclick="saveTelegramSettings()" style="flex: 1; padding: 10px;">Сохранить бота</button>
+            <button type="button" class="cancel-btn" onclick="sendTestTelegramMessage()" style="padding: 10px;">🔔 Тест</button>
+          </div>
+        </div>
+
+        <!-- System Web Notifications Trigger -->
+        <div class="section-card" style="padding: 14px;">
+          <button class="action-btn-row" onclick="requestWebNotificationPermission()" style="width: 100%;">
+            <span>🔔 Разрешить системные уведомления браузера</span>
+            <span class="chevron">›</span>
+          </button>
+        </div>
+
+        <!-- Account Actions -->
+        <div class="section-card account-actions-card">
+          <h3>Управление аккаунтом</h3>
+          
+          <button class="action-btn-row" onclick="exportDataBackup()">
+            <span>📥 Скачать резервную копию данных</span>
+            <span class="chevron">›</span>
+          </button>
+
+          <button class="action-btn-row" onclick="document.getElementById('importFileInput').click()">
+            <span>📤 Восстановить данные из файла</span>
+            <span class="chevron">›</span>
+          </button>
+          <input type="file" id="importFileInput" style="display: none" accept=".json" onchange="importDataBackup(event)">
+
+          <button class="action-btn-row logout-btn" onclick="handleLogout()">
+            <span>🚪 Выйти из аккаунта</span>
+            <span class="chevron">›</span>
+          </button>
+        </div>
+
+        <!-- DANGER ZONE: DELETE ACCOUNT -->
+        <div class="danger-zone-card" style="margin-bottom: 14px;">
+          <div class="danger-header">
+            <span class="danger-icon">⚠️</span>
+            <h4>Опасная зона</h4>
+          </div>
+          <p class="danger-desc">
+            Удаление аккаунта <b>навсегда сотрет</b> все ваши данные: расписание, историю тренировок и расчет штрафов. Придется регистрироваться заново.
+          </p>
+          <button class="delete-account-btn" onclick="confirmDeleteAccount()">
+            Удалить аккаунт навсегда
+          </button>
+        </div>
+
+        <button type="button" class="cancel-btn" style="width: 100%;" onclick="closeProfileModal()">Закрыть настройки</button>
       </div>
     </div>
 
@@ -427,6 +577,6 @@
 
   </div>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
