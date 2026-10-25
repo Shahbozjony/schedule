@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Дисциплина & Расписание</title>
+  
+  <!-- PWA & Apple Web App Meta -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Дисциплина">
+  <meta name="theme-color" content="#090d16">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- AUTH SCREEN -->
+    <div id="authScreen" class="screen active">
+      <div class="auth-container">
+        <div class="auth-header">
+          <div class="logo-badge">🔥</div>
+          <h1>Дисциплина OS</h1>
+          <p class="subtitle">Твое жесткое расписание и трекер отжиманий</p>
+        </div>
+
+        <div class="auth-tabs">
+          <button id="tabLoginBtn" class="tab-btn active" onclick="switchAuthTab('login')">Вход</button>
+          <button id="tabRegisterBtn" class="tab-btn" onclick="switchAuthTab('register')">Регистрация</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+          <div class="input-group">
+            <label for="loginUsername">Логин или Почта</label>
+            <input type="text" id="loginUsername" placeholder="Введите ваш логин" required autocomplete="username">
+          </div>
+          <div class="input-group">
+            <label for="loginPassword">Пароль</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+          </div>
+          <button type="submit" class="primary-btn pulse">Войти в аккаунт</button>
+          <div id="loginError" class="auth-error hidden"></div>
+        </form>
+
+        <!-- Register Form -->
+        <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
+          <div class="input-group">
+            <label for="regName">Ваше имя</label>
+            <input type="text" id="regName" placeholder="Например, Алишер" required>
+          </div>
+          <div class="input-group">
+            <label for="regUsername">Логин (для входа)</label>
+            <input type="text" id="regUsername" placeholder="Придумайте логин" required autocomplete="username">
+          </div>
+          <div class="input-group">
+            <label for="regPassword">Пароль</label>
+            <input type="password" id="regPassword" placeholder="Минимум 4 символа" required autocomplete="new-password">
+          </div>
+          <button type="submit" class="primary-btn">Создать аккаунт</button>
+          <div id="regError" class="auth-error hidden"></div>
+        </form>
+
+        <div class="auth-footer-note">
+          🔒 Все ваши данные привязаны исключительно к вашему аккаунту. При удалении аккаунта всё расписание стирается безвозвратно.
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN APP SCREEN -->
+    <div id="mainScreen" class="screen hidden">
+      <!-- Top App Bar -->
+      <header class="top-bar">
+        <div class="user-greeting">
+          <div class="avatar" id="userAvatar">U</div>
+          <div>
+            <div class="date-str" id="currentDateStr">25 октября, Воскресенье</div>
+            <div class="user-name-title">Привет, <span id="displayName">Атлет</span> 👋</div>
+          </div>
+        </div>
+        <div class="top-bar-actions">
+          <div class="live-clock" id="liveClock">21:45</div>
+        </div>
+      </header>
+
+      <!-- Main Content Container with Tabs -->
+      <main class="content-container">
+
+        <!-- TAB 1: SCHEDULE (Жесткое расписание) -->
+        <section id="viewSchedule" class="app-view active">
+          <div class="section-card schedule-hero">
+            <div class="hero-left">
+              <span class="badge-tag">Жесткий тайм-блок</span>
+              <h2>План на сегодня</h2>
+              <p class="card-desc">Следуй графику час за часом без компромиссов</p>
+            </div>
+            <div class="progress-circle-wrap">
+              <div class="circular-progress" id="scheduleProgressCircle">
+                <span id="scheduleProgressPercent">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Current Active Block Card -->
+          <div class="current-focus-card" id="currentFocusCard">
+            <div class="focus-pulse-dot"></div>
+            <div class="focus-content">
+              <div class="focus-label">ТЕКУЩИЙ БЛОК ВРЕМЕНИ</div>
+              <div class="focus-title" id="currentBlockTitle">Загрузка...</div>
+              <div class="focus-time" id="currentBlockTime">--:-- - --:--</div>
+            </div>
+            <button class="check-focus-btn" id="quickToggleCurrentBtn" onclick="toggleCurrentBlock()">
+              ✓ Сделано
+            </button>
+          </div>
+
+          <!-- Schedule Controls -->
+          <div class="schedule-actions-row">
+            <span class="section-title">Все блоки дня</span>
+            <button class="add-slot-btn" onclick="openAddSlotModal()">+ Добавить блок</button>
+          </div>
+
+          <!-- Timeline List -->
+          <div class="timeline-list" id="timelineList">
+            <!-- Rendered by JS -->
+          </div>
+        </section>
+
+        <!-- TAB 2: PUSH-UPS (Отжимания) -->
+        <section id="viewPushups" class="app-view hidden">
+          <!-- Streak & Target Banner -->
+          <div class="stats-grid">
+            <div class="stat-card streak-card">
+              <div class="stat-icon">🔥</div>
+              <div class="stat-val" id="streakCount">0</div>
+              <div class="stat-lbl">Дней стрик</div>
+            </div>
+            <div class="stat-card penalty-stat-card">
+              <div class="stat-icon">⚠️</div>
+              <div class="stat-val" id="todayPenaltyStatus">0 сум</div>
+              <div class="stat-lbl">Штраф сегодня</div>
+            </div>
+          </div>
+
+          <!-- Today's Pushup Mission -->
+          <div class="section-card pushup-mission-card">
+            <div class="mission-header">
+              <div>
+                <span class="badge-tag pushup-tag">Цель на сегодня</span>
+                <h3 class="mission-title">Прогрессивная нагрузка</h3>
+              </div>
+              <button class="edit-target-btn" onclick="openChangeTargetModal()">Изменить цель ✏️</button>
+            </div>
+
+            <!-- Big Pushup Counter -->
+            <div class="pushup-counter-box">
+              <div class="counter-display">
+                <span class="count-done" id="pushupsDone">0</span>
+                <span class="count-divider">/</span>
+                <span class="count-target" id="pushupsTarget">50</span>
+              </div>
+              <div class="counter-sub">отжиманий сделано</div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="pushupProgressBar" style="width: 0%"></div>
+            </div>
+            <div class="progress-status-row">
+              <span id="pushupStatusText">Нужно поднажать!</span>
+              <span id="pushupPercentText">0%</span>
+            </div>
+
+            <!-- Quick Add Reps Buttons -->
+            <div class="quick-add-grid">
+              <button class="rep-btn" onclick="addPushupReps(10)">+10</button>
+              <button class="rep-btn" onclick="addPushupReps(15)">+15</button>
+              <button class="rep-btn" onclick="addPushupReps(20)">+20</button>
+              <button class="rep-btn rep-all-btn" onclick="completeAllPushups()">Завершить все! 🎯</button>
+            </div>
+
+            <!-- Custom Input -->
+            <div class="custom-rep-input-row">
+              <input type="number" id="customRepsInput" placeholder="Свой подход..." min="1" max="500">
+              <button class="custom-add-btn" onclick="addCustomReps()">Записать</button>
+              <button class="reset-today-btn" title="Сбросить на 0" onclick="resetTodayPushups()">↺</button>
+            </div>
+          </div>
+
+          <!-- Daily Status Resolution -->
+          <div class="day-verdict-box" id="dayVerdictBox">
+            <!-- Rendered by JS: either 'Цель достигнута - красавчик!' or 'Пропуск дня: Штраф 5000 сум' -->
+          </div>
+
+          <!-- Recent Push-up History -->
+          <div class="section-card history-card">
+            <h3>История за последние 7 дней</h3>
+            <div class="history-list" id="pushupHistoryList">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: PENALTY BANK (Банка штрафов) -->
+        <section id="viewPenalties" class="app-view hidden">
+          <div class="penalty-hero-card">
+            <div class="penalty-piggy-icon">💰</div>
+            <div class="penalty-title">Банка штрафов</div>
+            <div class="penalty-hero-amount" id="monthlyPenaltyTotal">0 сум</div>
+            <div class="penalty-month-label" id="penaltyMonthLabel">Итого за Октябрь 2026</div>
+            <p class="penalty-rules-tip">
+              * За каждый пропущенный день отжиманий начисляется <b>5 000 сум</b>.
+            </p>
+          </div>
+
+          <!-- Month Selector -->
+          <div class="month-selector-bar">
+            <button class="month-nav-btn" onclick="changePenaltyMonth(-1)">‹ Назад</button>
+            <span class="current-selected-month" id="selectedMonthName">Октябрь 2026</span>
+            <button class="month-nav-btn" onclick="changePenaltyMonth(1)">Вперед ›</button>
+          </div>
+
+          <!-- Penalty Breakdown Stats -->
+          <div class="stats-grid three-col">
+            <div class="stat-card">
+              <div class="stat-val text-green" id="monthSuccessDays">0</div>
+              <div class="stat-lbl">Дней в цели</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val text-red" id="monthMissedDays">0</div>
+              <div class="stat-lbl">Пропусков</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val text-yellow" id="monthSuccessRate">0%</div>
+              <div class="stat-lbl">Успех</div>
+            </div>
+          </div>
+
+          <!-- Days List in Month -->
+          <div class="section-card month-log-card">
+            <h3>Журнал дней месяца</h3>
+            <div class="month-days-list" id="monthDaysList">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: PROFILE & SETTINGS (Аккаунт) -->
+        <section id="viewProfile" class="app-view hidden">
+          <div class="profile-card">
+            <div class="big-avatar" id="profileBigAvatar">U</div>
+            <h2 id="profileName">Пользователь</h2>
+            <div class="profile-username" id="profileUsername">@login</div>
+            <div class="member-since" id="memberSince">В системе с 2026 года</div>
+          </div>
+
+          <!-- Install on iPhone Helper Box -->
+          <div class="section-card pwa-install-box">
+            <div class="pwa-header">
+              <div class="apple-icon">📱</div>
+              <h4>Установка на экран iPhone</h4>
+            </div>
+            <p class="pwa-text">Чтобы приложение открывалось как нативное без рамок Safari:</p>
+            <ol class="pwa-steps">
+              <li>Открой эту страницу в <b>Safari</b>.</li>
+              <li>Нажми значок <b>«Поделиться»</b> (квадрат со стрелкой вверх) внизу.</li>
+              <li>Выбери <b>«На экран "Домой"»</b> (Add to Home Screen).</li>
+            </ol>
+          </div>
+
+          <!-- Account Actions -->
+          <div class="section-card account-actions-card">
+            <h3>Управление аккаунтом</h3>
+            
+            <button class="action-btn-row" onclick="exportDataBackup()">
+              <span>📥 Скачать резервную копию данных</span>
+              <span class="chevron">›</span>
+            </button>
+
+            <button class="action-btn-row" onclick="document.getElementById('importFileInput').click()">
+              <span>📤 Восстановить данные из файла</span>
+              <span class="chevron">›</span>
+            </button>
+            <input type="file" id="importFileInput" style="display: none" accept=".json" onchange="importDataBackup(event)">
+
+            <button class="action-btn-row logout-btn" onclick="handleLogout()">
+              <span>🚪 Выйти из аккаунта</span>
+              <span class="chevron">›</span>
+            </button>
+          </div>
+
+          <!-- DANGER ZONE: DELETE ACCOUNT -->
+          <div class="danger-zone-card">
+            <div class="danger-header">
+              <span class="danger-icon">⚠️</span>
+              <h4>Опасная зона</h4>
+            </div>
+            <p class="danger-desc">
+              Удаление аккаунта <b>навсегда сотрет</b> все ваши данные: всё расписание, историю отжиманий и расчет штрафов. После этого войти будет невозможно — придется создавать новый аккаунт с чистого листа.
+            </p>
+            <button class="delete-account-btn" onclick="confirmDeleteAccount()">
+              Удалить аккаунт навсегда
+            </button>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Bottom Tab Bar for iPhone -->
+      <nav class="bottom-tab-bar">
+        <button class="nav-tab-item active" onclick="switchView('viewSchedule')">
+          <span class="tab-icon">📋</span>
+          <span class="tab-label">Расписание</span>
+        </button>
+        <button class="nav-tab-item" onclick="switchView('viewPushups')">
+          <span class="tab-icon">💪</span>
+          <span class="tab-label">Отжимания</span>
+        </button>
+        <button class="nav-tab-item" onclick="switchView('viewPenalties')">
+          <span class="tab-icon">💰</span>
+          <span class="tab-label">Штрафы</span>
+        </button>
+        <button class="nav-tab-item" onclick="switchView('viewProfile')">
+          <span class="tab-icon">👤</span>
+          <span class="tab-label">Аккаунт</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- MODAL: ADD/EDIT SCHEDULE BLOCK -->
+    <div id="slotModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 id="modalSlotTitle">Новый блок времени</h3>
+        <form id="slotForm" onsubmit="saveScheduleSlot(event)">
+          <input type="hidden" id="slotId">
+          <div class="input-group">
+            <label>Название дела / задачи</label>
+            <input type="text" id="slotName" placeholder="Например: Глубокая работа" required>
+          </div>
+          <div class="input-row-2">
+            <div class="input-group">
+              <label>Время начала</label>
+              <input type="time" id="slotStart" required>
+            </div>
+            <div class="input-group">
+              <label>Время окончания</label>
+              <input type="time" id="slotEnd" required>
+            </div>
+          </div>
+          <div class="input-group">
+            <label>Категория / Цвет</label>
+            <select id="slotCategory">
+              <option value="routine">🌅 Утро / Рутина</option>
+              <option value="work">💼 Работа / Учеба</option>
+              <option value="sport">🥊 Спорт / Отжимания</option>
+              <option value="rest">🧘 Отдых / Обед</option>
+              <option value="sleep">🌙 Сон / Отбой</option>
+            </select>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeSlotModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Сохранить</button>
+          </div>
+          <button type="button" id="deleteSlotBtn" class="delete-link-btn hidden" onclick="deleteCurrentSlot()">Удалить этот блок</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: CHANGE TARGET PUSHUPS -->
+    <div id="targetModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3>Изменить цель отжиманий</h3>
+        <p class="modal-sub">Каждый раз повышай планку, чтобы расти в результатах!</p>
+        <form onsubmit="saveNewPushupTarget(event)">
+          <div class="input-group">
+            <label>Цель на сегодня (отжиманий)</label>
+            <input type="number" id="newTargetInput" min="5" max="1000" required>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeTargetModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Установить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
