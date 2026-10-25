@@ -742,14 +742,26 @@ function deleteCurrentSlot() {
 }
 
 /* =========================================================
-   WORKOUT TAB LOGIC (Multi-exercise Tracker)
+   WORKOUT TAB LOGIC (Multi-exercise Tracker & Day Splits)
    ========================================================= */
 
+const WEEK_DAYS = [
+  { code: 'mon', label: 'Пн' },
+  { code: 'tue', label: 'Вт' },
+  { code: 'wed', label: 'Ср' },
+  { code: 'thu', label: 'Чт' },
+  { code: 'fri', label: 'Пт' },
+  { code: 'sat', label: 'Сб' },
+  { code: 'sun', label: 'Вс' }
+];
+
+let currentWorkoutDayFilter = 'today';
+
 const DEFAULT_EXERCISES = [
-  { id: 'ex_pushups', name: 'Отжимания от пола', icon: '💥', type: 'reps', target: 50 },
-  { id: 'ex_bench', name: 'Жим штанги лежа', icon: '🏋️', type: 'sets', target: 4 },
-  { id: 'ex_triceps', name: 'Гантели на трицепс', icon: '💪', type: 'sets', target: 3 },
-  { id: 'ex_plank', name: 'Планка на предплечьях', icon: '⏱️', type: 'reps', target: 120 }
+  { id: 'ex_pushups', name: 'Отжимания от пола', icon: '💥', type: 'reps', target: 50, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
+  { id: 'ex_bench', name: 'Жим штанги лежа', icon: '🏋️', type: 'sets', target: 4, days: ['mon', 'wed', 'fri'] },
+  { id: 'ex_triceps', name: 'Гантели на трицепс', icon: '💪', type: 'sets', target: 3, days: ['mon', 'wed', 'fri'] },
+  { id: 'ex_plank', name: 'Планка на предплечьях', icon: '⏱️', type: 'reps', target: 120, days: ['tue', 'thu', 'sat'] }
 ];
 
 function initUserExercises() {
@@ -757,6 +769,14 @@ function initUserExercises() {
   if (!currentUser.exercises || currentUser.exercises.length === 0) {
     currentUser.exercises = JSON.parse(JSON.stringify(DEFAULT_EXERCISES));
   }
+  
+  // Ensure all exercises have a days array
+  currentUser.exercises.forEach(ex => {
+    if (!ex.days || !Array.isArray(ex.days) || ex.days.length === 0) {
+      ex.days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    }
+  });
+
   if (!currentUser.workoutLogs) {
     currentUser.workoutLogs = {};
   }
@@ -780,21 +800,76 @@ function initUserExercises() {
   saveCurrentUser();
 }
 
+function setWorkoutDayFilter(filterCode) {
+  currentWorkoutDayFilter = filterCode;
+  document.querySelectorAll('.day-filter-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = document.getElementById(`filterDay_${filterCode}`);
+  if (activeBtn) activeBtn.classList.add('active');
+  renderPushups();
+}
+
+function toggleExerciseDay(exId, dayCode) {
+  if (!currentUser) return;
+  const ex = currentUser.exercises.find(e => e.id === exId);
+  if (!ex) return;
+
+  if (!ex.days) ex.days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+  const idx = ex.days.indexOf(dayCode);
+  if (idx > -1) {
+    if (ex.days.length === 1) {
+      alert('Упражнение должно быть назначено хотя бы на один день!');
+      return;
+    }
+    ex.days.splice(idx, 1);
+  } else {
+    ex.days.push(dayCode);
+  }
+
+  saveCurrentUser();
+  renderPushups();
+}
+
 function renderPushups() {
   if (!currentUser) return;
   initUserExercises();
 
   const todayKey = getTodayDateKey();
   const todayLog = currentUser.workoutLogs[todayKey];
-  const exercises = currentUser.exercises;
+  const allExercises = currentUser.exercises;
 
   const container = document.getElementById('exercisesContainer');
   if (!container) return;
   container.innerHTML = '';
 
+  // Determine current day code
+  const dayIndex = new Date().getDay(); // 0 is Sun, 1 is Mon...
+  const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayCode = dayMap[dayIndex];
+
+  // Filter exercises depending on current filter
+  let visibleExercises = allExercises;
+  if (currentWorkoutDayFilter === 'today') {
+    visibleExercises = allExercises.filter(ex => ex.days && ex.days.includes(todayCode));
+  } else if (currentWorkoutDayFilter !== 'all') {
+    visibleExercises = allExercises.filter(ex => ex.days && ex.days.includes(currentWorkoutDayFilter));
+  }
+
   let completedCount = 0;
 
-  exercises.forEach(ex => {
+  if (visibleExercises.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 30px 16px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px dashed var(--border);">
+        <div style="font-size: 32px; margin-bottom: 8px;">🌴</div>
+        <div style="font-size: 15px; font-weight: 700;">На этот день нет упражнений</div>
+        <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">
+          Переключитесь на вкладку «Все» вверху и нажмите на дни недели, чтобы назначить упражнения на этот день.
+        </div>
+      </div>
+    `;
+  }
+
+  visibleExercises.forEach(ex => {
     const exData = todayLog.exercises[ex.id] || (ex.type === 'reps' ? { done: 0, completed: false } : { sets: [], completed: false });
     
     let isCompleted = exData.completed;
@@ -804,6 +879,12 @@ function renderPushups() {
 
     const card = document.createElement('div');
     card.className = `exercise-card ${isCompleted ? 'completed' : ''}`;
+
+    // Day chips HTML
+    const dayChipsHtml = WEEK_DAYS.map(d => {
+      const isDayActive = ex.days && ex.days.includes(d.code);
+      return `<span class="ex-day-chip ${isDayActive ? 'active' : ''}" onclick="toggleExerciseDay('${ex.id}', '${d.code}')">${d.label}</span>`;
+    }).join('');
 
     let bodyHtml = '';
 
@@ -858,6 +939,85 @@ function renderPushups() {
           </button>
           <button class="quick-done-check-btn ${isCompleted ? 'done' : ''}" onclick="toggleExerciseCompleted('${ex.id}')">
             ${isCompleted ? '✓ Сделано' : 'Завершить'}
+          </button>
+        </div>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="ex-header">
+        <div class="ex-title-wrap">
+          <div class="ex-icon">${ex.icon || '🏋️'}</div>
+          <div>
+            <div class="ex-name">${escapeHtml(ex.name)}</div>
+            <div class="ex-meta">${ex.type === 'sets' ? `Цель: ${ex.target} подх.` : `Цель: ${ex.target} повт./сек`}</div>
+            <div class="ex-days-row">
+              <span class="ex-days-label">Дни:</span>
+              ${dayChipsHtml}
+            </div>
+          </div>
+        </div>
+        <div class="ex-actions-top">
+          <button class="ex-btn-icon" title="Изменить цель" onclick="openChangeTargetModalEx('${ex.id}', ${ex.target}, '${ex.type}')">✏️</button>
+          <button class="ex-btn-icon" title="Удалить упражнение" onclick="deleteExercise('${ex.id}')">🗑️</button>
+        </div>
+      </div>
+      ${bodyHtml}
+    `;
+
+    container.appendChild(card);
+  });
+
+  const streakEl = document.getElementById('streakCount');
+  if (streakEl) streakEl.textContent = currentUser.streak || 0;
+
+  const exDoneEl = document.getElementById('workoutExercisesDone');
+  if (exDoneEl) exDoneEl.textContent = `${completedCount}/${visibleExercises.length}`;
+
+  const penaltyStat = document.getElementById('todayPenaltyStatus');
+  const verdictBox = document.getElementById('dayVerdictBox');
+
+  const isAllDone = visibleExercises.length > 0 && completedCount === visibleExercises.length;
+
+  if (isAllDone || todayLog.status === 'success') {
+    todayLog.status = 'success';
+    todayLog.penalty = 0;
+    if (penaltyStat) {
+      penaltyStat.textContent = '0 сум';
+      penaltyStat.style.color = 'var(--accent-green)';
+    }
+
+    if (verdictBox) {
+      verdictBox.className = 'day-verdict-box verdict-success';
+      verdictBox.innerHTML = `
+        <div>🎯 ТРЕНИРОВКА ДНЯ ВЫПОЛНЕНА! Красавчик!</div>
+        <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
+          Штраф за сегодня: 0 сум. Серия побед продолжается!
+        </div>
+      `;
+    }
+  } else {
+    todayLog.status = 'pending';
+    todayLog.penalty = 5000;
+    if (penaltyStat) {
+      penaltyStat.textContent = '5 000 сум';
+      penaltyStat.style.color = 'var(--accent-red)';
+    }
+
+    if (verdictBox) {
+      verdictBox.className = 'day-verdict-box verdict-penalty';
+      verdictBox.innerHTML = `
+        <div>⚠️ ТРЕНИРОВКА В ПРОЦЕССЕ (${completedCount}/${visibleExercises.length})</div>
+        <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
+          Закрой упражнения плана до полуночи, иначе штраф составит <b>5 000 сум</b>!
+        </div>
+      `;
+    }
+  }
+
+  saveCurrentUser();
+  renderWorkoutHistory();
+}
           </button>
         </div>
       `;
@@ -1167,21 +1327,44 @@ function renderPenalties() {
   document.getElementById('selectedMonthName').textContent = `${monthNames[month]} ${year}`;
   document.getElementById('penaltyMonthLabel').textContent = `Итого за ${monthNames[month]} ${year}`;
 
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysListEl = document.getElementById('monthDaysList');
+  daysListEl.innerHTML = '';
+
   const today = new Date();
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+
+  // If viewing a future month (e.g. November when today is October):
+  if (year > currentYear || (year === currentYear && month > currentMonth)) {
+    document.getElementById('monthlyPenaltyTotal').textContent = '0 сум';
+    document.getElementById('monthSuccessDays').textContent = '0';
+    document.getElementById('monthMissedDays').textContent = '0';
+    document.getElementById('monthSuccessRate').textContent = '—';
+    daysListEl.innerHTML = '<div style="padding: 30px 16px; text-align: center; color: var(--text-dim); font-size: 14px;">📅 Этот месяц еще не наступил. Штрафов нет!</div>';
+    return;
+  }
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const isCurrentMonth = currentYear === year && currentMonth === month;
   const maxDayToCheck = isCurrentMonth ? today.getDate() : daysInMonth;
+
+  const createdDate = new Date(currentUser.createdAt || Date.now());
+  const createdYear = createdDate.getFullYear();
+  const createdMonth = createdDate.getMonth();
+  const createdDay = createdDate.getDate();
 
   let totalMonthPenalty = 0;
   let successDays = 0;
   let missedDays = 0;
 
-  const daysListEl = document.getElementById('monthDaysList');
-  daysListEl.innerHTML = '';
-
   const slots = currentUser.scheduleSlots || [];
 
   for (let day = 1; day <= maxDayToCheck; day++) {
+    // Skip days before account was created
+    if (year === createdYear && month === createdMonth && day < createdDay) {
+      continue;
+    }
+
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const completedList = (currentUser.scheduleCompletions && currentUser.scheduleCompletions[dateKey]) || [];
     const isToday = isCurrentMonth && day === today.getDate();
@@ -1192,16 +1375,15 @@ function renderPenalties() {
 
     slots.forEach(s => {
       if (!completedList.includes(s.id)) {
-        // If it's today, check if time has passed
         if (isToday) {
           const nowMins = today.getHours() * 60 + today.getMinutes();
           if (nowMins > timeToMinutes(s.end)) {
             missedSlots.push(s);
-            dayPenaltySum += (s.penalty || DEFAULT_PENALTY_AMOUNT);
+            dayPenaltySum += (s.penalty !== undefined ? s.penalty : DEFAULT_PENALTY_AMOUNT);
           }
         } else {
           missedSlots.push(s);
-          dayPenaltySum += (s.penalty || DEFAULT_PENALTY_AMOUNT);
+          dayPenaltySum += (s.penalty !== undefined ? s.penalty : DEFAULT_PENALTY_AMOUNT);
         }
       }
     });

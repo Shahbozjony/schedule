@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -165,6 +165,19 @@
           <div class="schedule-actions-row">
             <span class="section-title">Программа тренировки</span>
             <button class="add-slot-btn" onclick="openAddExerciseModal()">+ Упражнение</button>
+          </div>
+
+          <!-- Day of Week Selector Bar -->
+          <div class="day-filter-bar">
+            <button class="day-filter-btn active" id="filterDay_today" onclick="setWorkoutDayFilter('today')">⭐ На сегодня</button>
+            <button class="day-filter-btn" id="filterDay_mon" onclick="setWorkoutDayFilter('mon')">Пн</button>
+            <button class="day-filter-btn" id="filterDay_tue" onclick="setWorkoutDayFilter('tue')">Вт</button>
+            <button class="day-filter-btn" id="filterDay_wed" onclick="setWorkoutDayFilter('wed')">Ср</button>
+            <button class="day-filter-btn" id="filterDay_thu" onclick="setWorkoutDayFilter('thu')">Чт</button>
+            <button class="day-filter-btn" id="filterDay_fri" onclick="setWorkoutDayFilter('fri')">Пт</button>
+            <button class="day-filter-btn" id="filterDay_sat" onclick="setWorkoutDayFilter('sat')">Сб</button>
+            <button class="day-filter-btn" id="filterDay_sun" onclick="setWorkoutDayFilter('sun')">Вс</button>
+            <button class="day-filter-btn" id="filterDay_all" onclick="setWorkoutDayFilter('all')">Все</button>
           </div>
 
           <!-- Exercises Dynamic Container -->
@@ -577,6 +590,6 @@
 
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
