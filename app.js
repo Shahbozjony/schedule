@@ -252,39 +252,36 @@ function formatCurrencyUZS(amount) {
 }
 
 /**
- * Checks all past days in user history. If a day had target > 0 and done < target,
+ * Checks all past days in user history. If a workout was not completed,
  * mark it as missed with 5000 UZS penalty.
  */
 function auditPastDaysPenalties() {
   if (!currentUser) return;
+  initUserExercises();
   const todayKey = getTodayDateKey();
 
-  if (!currentUser.pushupLogs) currentUser.pushupLogs = {};
-  if (!currentUser.pushupLogs[todayKey]) {
-    currentUser.pushupLogs[todayKey] = {
-      target: currentUser.pushupTarget || 50,
-      done: 0,
-      penalty: 0,
-      status: 'pending'
+  if (!currentUser.workoutLogs) currentUser.workoutLogs = {};
+  if (!currentUser.workoutLogs[todayKey]) {
+    currentUser.workoutLogs[todayKey] = {
+      status: 'pending',
+      penalty: PENALTY_AMOUNT_PER_DAY,
+      exercises: {}
     };
   }
 
-  // Calculate streak based on past days
   let streak = 0;
-  const sortedDates = Object.keys(currentUser.pushupLogs).sort().reverse();
+  const sortedDates = Object.keys(currentUser.workoutLogs).sort().reverse();
   
   for (const dateKey of sortedDates) {
-    const log = currentUser.pushupLogs[dateKey];
+    const log = currentUser.workoutLogs[dateKey];
     if (dateKey === todayKey) {
-      if (log.done >= log.target) streak++;
+      if (log.status === 'success' || log.penalty === 0) streak++;
       continue;
     }
 
-    // If past day was not completed
-    if (log.done < log.target) {
+    if (log.status !== 'success' && log.penalty !== 0) {
       log.status = 'missed';
       log.penalty = PENALTY_AMOUNT_PER_DAY;
-      // Streak breaks at first past missed day
       break;
     } else {
       log.status = 'success';
@@ -577,122 +574,351 @@ function deleteCurrentSlot() {
 }
 
 /* =========================================================
-   PUSH-UPS & PENALTY CALCULATION
+   WORKOUT & MULTI-EXERCISE SYSTEM (Отжимания, Жим, Трицепс)
    ========================================================= */
 
-function renderPushups() {
-  if (!currentUser) return;
-  const todayKey = getTodayDateKey();
-  if (!currentUser.pushupLogs) currentUser.pushupLogs = {};
+const DEFAULT_EXERCISES = [
+  { id: 'ex_pushups', name: 'Отжимания от пола', icon: '💥', type: 'reps', target: 50 },
+  { id: 'ex_bench', name: 'Жим штанги лежа', icon: '🏋️', type: 'sets', target: 4 },
+  { id: 'ex_triceps', name: 'Гантели на трицепс', icon: '💪', type: 'sets', target: 3 }
+];
 
-  if (!currentUser.pushupLogs[todayKey]) {
-    currentUser.pushupLogs[todayKey] = {
-      target: currentUser.pushupTarget || 50,
-      done: 0,
-      penalty: 0,
-      status: 'pending'
+function initUserExercises() {
+  if (!currentUser) return;
+  if (!currentUser.exercises || currentUser.exercises.length === 0) {
+    currentUser.exercises = JSON.parse(JSON.stringify(DEFAULT_EXERCISES));
+  }
+  if (!currentUser.workoutLogs) {
+    currentUser.workoutLogs = {};
+  }
+  const todayKey = getTodayDateKey();
+  if (!currentUser.workoutLogs[todayKey]) {
+    currentUser.workoutLogs[todayKey] = {
+      status: 'pending',
+      penalty: PENALTY_AMOUNT_PER_DAY,
+      exercises: {}
     };
   }
 
-  const todayLog = currentUser.pushupLogs[todayKey];
-  const target = todayLog.target || currentUser.pushupTarget || 50;
-  const done = todayLog.done || 0;
+  // Ensure default structures
+  currentUser.exercises.forEach(ex => {
+    if (!currentUser.workoutLogs[todayKey].exercises[ex.id]) {
+      currentUser.workoutLogs[todayKey].exercises[ex.id] = ex.type === 'reps' 
+        ? { done: (currentUser.pushupLogs && currentUser.pushupLogs[todayKey] ? currentUser.pushupLogs[todayKey].done : 0), completed: false }
+        : { sets: [], completed: false };
+    }
+  });
 
-  // Display counters
-  document.getElementById('pushupsDone').textContent = done;
-  document.getElementById('pushupsTarget').textContent = target;
+  saveCurrentUser();
+}
+
+function renderPushups() {
+  if (!currentUser) return;
+  initUserExercises();
+
+  const todayKey = getTodayDateKey();
+  const todayLog = currentUser.workoutLogs[todayKey];
+  const exercises = currentUser.exercises;
+
+  const container = document.getElementById('exercisesContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  let completedCount = 0;
+
+  exercises.forEach(ex => {
+    const exData = todayLog.exercises[ex.id] || (ex.type === 'reps' ? { done: 0, completed: false } : { sets: [], completed: false });
+    
+    // Check if auto-completed
+    let isCompleted = exData.completed;
+    if (ex.type === 'reps' && exData.done >= ex.target) isCompleted = true;
+    if (ex.type === 'sets' && exData.sets && exData.sets.length >= ex.target) isCompleted = true;
+    if (isCompleted) completedCount++;
+
+    const card = document.createElement('div');
+    card.className = `exercise-card ${isCompleted ? 'completed' : ''}`;
+
+    let bodyHtml = '';
+
+    if (ex.type === 'reps') {
+      const done = exData.done || 0;
+      const target = ex.target || 50;
+      const percent = Math.min(100, Math.round((done / target) * 100));
+
+      bodyHtml = `
+        <div class="pushup-counter-box" style="margin: 6px 0 10px;">
+          <div class="counter-display">
+            <span class="count-done" style="font-size: 38px;">${done}</span>
+            <span class="count-divider">/</span>
+            <span class="count-target" style="font-size: 28px;">${target}</span>
+          </div>
+          <div class="counter-sub">повторений сделано</div>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" style="width: ${percent}%;"></div>
+        </div>
+        <div class="progress-status-row" style="margin-bottom: 8px;">
+          <span>${isCompleted ? '✓ Выполнено!' : 'Осталось: ' + Math.max(0, target - done)}</span>
+          <span>${percent}%</span>
+        </div>
+        <div class="quick-add-grid">
+          <button class="rep-btn" onclick="addRepsToExercise('${ex.id}', 10)">+10</button>
+          <button class="rep-btn" onclick="addRepsToExercise('${ex.id}', 15)">+15</button>
+          <button class="rep-btn" onclick="addRepsToExercise('${ex.id}', 20)">+20</button>
+          <button class="rep-btn" onclick="completeRepsExercise('${ex.id}')">Завершить 🎯</button>
+        </div>
+      `;
+    } else {
+      // Sets with weight
+      const sets = exData.sets || [];
+      const setsHtml = sets.length > 0 
+        ? sets.map((s, idx) => `
+            <div class="set-chip">
+              <span class="set-num">#${idx + 1}</span>
+              <span>${s.weight} кг × ${s.reps} раз</span>
+              <span class="set-chip-delete" onclick="deleteSet('${ex.id}', ${idx})">✕</span>
+            </div>
+          `).join('')
+        : '<div style="font-size: 12px; color: var(--text-dim);">Подходы пока не записаны</div>';
+
+      bodyHtml = `
+        <div class="sets-chips-list">
+          ${setsHtml}
+        </div>
+        <div class="ex-card-actions">
+          <button class="add-set-trigger-btn" onclick="openAddSetModal('${ex.id}', '${escapeHtml(ex.name)}')">
+            + Записать подход (${sets.length}/${ex.target})
+          </button>
+          <button class="quick-done-check-btn ${isCompleted ? 'done' : ''}" onclick="toggleExerciseCompleted('${ex.id}')">
+            ${isCompleted ? '✓ Сделано' : 'Завершить'}
+          </button>
+        </div>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="ex-header">
+        <div class="ex-title-wrap">
+          <div class="ex-icon">${ex.icon || '🏋️'}</div>
+          <div>
+            <div class="ex-name">${escapeHtml(ex.name)}</div>
+            <div class="ex-meta">${ex.type === 'sets' ? `Цель: ${ex.target} подх.` : `Цель: ${ex.target} повт.`}</div>
+          </div>
+        </div>
+        <div class="ex-actions-top">
+          <button class="ex-btn-icon" title="Изменить цель" onclick="openChangeTargetModalEx('${ex.id}', ${ex.target}, '${ex.type}')">✏️</button>
+          <button class="ex-btn-icon" title="Удалить упражнение" onclick="deleteExercise('${ex.id}')">🗑️</button>
+        </div>
+      </div>
+      ${bodyHtml}
+    `;
+
+    container.appendChild(card);
+  });
+
+  // Update top counters
   document.getElementById('streakCount').textContent = currentUser.streak || 0;
+  document.getElementById('workoutExercisesDone').textContent = `${completedCount}/${exercises.length}`;
 
-  // Progress Bar
-  const percent = Math.min(100, Math.round((done / target) * 100));
-  document.getElementById('pushupProgressBar').style.width = `${percent}%`;
-  document.getElementById('pushupPercentText').textContent = `${percent}%`;
-
-  const statusText = document.getElementById('pushupStatusText');
-  const verdictBox = document.getElementById('dayVerdictBox');
   const penaltyStat = document.getElementById('todayPenaltyStatus');
+  const verdictBox = document.getElementById('dayVerdictBox');
 
-  if (done >= target) {
-    statusText.textContent = '🔥 Цель дня выполнена!';
-    statusText.style.color = 'var(--accent-green)';
+  const isAllDone = exercises.length > 0 && completedCount === exercises.length;
+
+  if (isAllDone || todayLog.status === 'success') {
+    todayLog.status = 'success';
+    todayLog.penalty = 0;
     penaltyStat.textContent = '0 сум';
     penaltyStat.style.color = 'var(--accent-green)';
 
     verdictBox.className = 'day-verdict-box verdict-success';
     verdictBox.innerHTML = `
-      <div>🎯 ЦЕЛЬ ДОСТИГНУТА! Красавчик!</div>
+      <div>🎯 ТРЕНИРОВКА ДНЯ ВЫПОЛНЕНА! Красавчик!</div>
       <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
-        Штраф за сегодня: 0 сум. Серия побед растет!
+        Штраф за сегодня: 0 сум. Серия побед продолжается!
       </div>
     `;
-    todayLog.status = 'success';
-    todayLog.penalty = 0;
   } else {
-    const remaining = target - done;
-    statusText.textContent = `Осталось отжаться: ${remaining}`;
-    statusText.style.color = 'var(--text-muted)';
-    penaltyStat.textContent = '⚠️ 5 000 сум';
+    todayLog.status = 'pending';
+    todayLog.penalty = PENALTY_AMOUNT_PER_DAY;
+    penaltyStat.textContent = '5 000 сум';
     penaltyStat.style.color = 'var(--accent-red)';
 
     verdictBox.className = 'day-verdict-box verdict-penalty';
     verdictBox.innerHTML = `
-      <div>⚠️ ПЛАН ЕЩЕ НЕ ВЫПОЛНЕН!</div>
+      <div>⚠️ ТРЕНИРОВКА В ПРОЦЕССЕ (${completedCount}/${exercises.length})</div>
       <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
-        Если не сделать ${remaining} раз(а) до полуночи, штраф составит <b>5 000 сум</b>!
+        Закрой все упражнения до полуночи, иначе штраф составит <b>5 000 сум</b>!
       </div>
     `;
   }
 
   saveCurrentUser();
-  renderPushupHistory();
+  renderWorkoutHistory();
 }
 
-function addPushupReps(count) {
+// Reps exercise helper
+function addRepsToExercise(exId, count) {
   if (!currentUser) return;
   const todayKey = getTodayDateKey();
-  const log = currentUser.pushupLogs[todayKey];
-
-  log.done = (log.done || 0) + count;
+  const exData = currentUser.workoutLogs[todayKey].exercises[exId];
+  exData.done = (exData.done || 0) + count;
   playHapticSound('rep');
   renderPushups();
   renderPenalties();
 }
 
-function completeAllPushups() {
+function completeRepsExercise(exId) {
   if (!currentUser) return;
   const todayKey = getTodayDateKey();
-  const log = currentUser.pushupLogs[todayKey];
-  log.done = Math.max(log.done, log.target);
+  const ex = currentUser.exercises.find(e => e.id === exId);
+  const exData = currentUser.workoutLogs[todayKey].exercises[exId];
+  exData.done = Math.max(exData.done || 0, ex.target);
+  exData.completed = true;
   playHapticSound('targetAchieved');
   renderPushups();
   renderPenalties();
 }
 
-function addCustomReps() {
-  const input = document.getElementById('customRepsInput');
-  const count = parseInt(input.value, 10);
-  if (!isNaN(count) && count > 0) {
-    addPushupReps(count);
-    input.value = '';
-  }
+// Sets exercise helper
+function openAddSetModal(exId, exName) {
+  document.getElementById('setExerciseId').value = exId;
+  document.getElementById('setModalExerciseTitle').textContent = `Подход: ${exName}`;
+  document.getElementById('setWeightInput').value = '';
+  document.getElementById('setRepsInput').value = '';
+  document.getElementById('setModal').classList.remove('hidden');
 }
 
-function resetTodayPushups() {
+function closeSetModal() {
+  document.getElementById('setModal').classList.add('hidden');
+}
+
+function saveExerciseSet(e) {
+  e.preventDefault();
   if (!currentUser) return;
-  if (confirm('Сбросить количество отжиманий за сегодня на 0?')) {
-    const todayKey = getTodayDateKey();
-    currentUser.pushupLogs[todayKey].done = 0;
-    saveCurrentUser();
-    renderPushups();
-    renderPenalties();
-  }
+  const exId = document.getElementById('setExerciseId').value;
+  const weight = parseFloat(document.getElementById('setWeightInput').value) || 0;
+  const reps = parseInt(document.getElementById('setRepsInput').value, 10) || 0;
+
+  const todayKey = getTodayDateKey();
+  const exData = currentUser.workoutLogs[todayKey].exercises[exId];
+  if (!exData.sets) exData.sets = [];
+  exData.sets.push({ weight, reps });
+
+  playHapticSound('rep');
+  closeSetModal();
+  renderPushups();
+  renderPenalties();
 }
 
-function openChangeTargetModal() {
+function deleteSet(exId, setIdx) {
   if (!currentUser) return;
   const todayKey = getTodayDateKey();
-  const log = currentUser.pushupLogs[todayKey];
-  document.getElementById('newTargetInput').value = log.target || 50;
+  const exData = currentUser.workoutLogs[todayKey].exercises[exId];
+  if (exData && exData.sets) {
+    exData.sets.splice(setIdx, 1);
+    renderPushups();
+  }
+}
+
+function toggleExerciseCompleted(exId) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  const exData = currentUser.workoutLogs[todayKey].exercises[exId];
+  exData.completed = !exData.completed;
+  playHapticSound('success');
+  renderPushups();
+  renderPenalties();
+}
+
+function completeFullWorkoutToday() {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  const todayLog = currentUser.workoutLogs[todayKey];
+  todayLog.status = 'success';
+  todayLog.penalty = 0;
+
+  currentUser.exercises.forEach(ex => {
+    const exData = todayLog.exercises[ex.id];
+    if (exData) exData.completed = true;
+  });
+
+  playHapticSound('targetAchieved');
+  alert('Поздравляем! Тренировка дня полностью закрыта без штрафов! 🔥💪');
+  renderPushups();
+  renderPenalties();
+}
+
+// Add Custom Exercise Modal
+function openAddExerciseModal() {
+  document.getElementById('newExerciseName').value = '';
+  document.getElementById('newExerciseType').value = 'sets';
+  document.getElementById('newExerciseTarget').value = '4';
+  document.getElementById('newExTargetLabel').textContent = 'Целевое количество подходов';
+  document.getElementById('exerciseModal').classList.remove('hidden');
+}
+
+function closeExerciseModal() {
+  document.getElementById('exerciseModal').classList.add('hidden');
+}
+
+function toggleExerciseTypeFields() {
+  const type = document.getElementById('newExerciseType').value;
+  const lbl = document.getElementById('newExTargetLabel');
+  const targetInput = document.getElementById('newExerciseTarget');
+  if (type === 'sets') {
+    lbl.textContent = 'Целевое количество подходов';
+    targetInput.value = '4';
+  } else {
+    lbl.textContent = 'Целевое количество повторений';
+    targetInput.value = '50';
+  }
+}
+
+function saveCustomExercise(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+  const name = document.getElementById('newExerciseName').value.trim();
+  const type = document.getElementById('newExerciseType').value;
+  const target = parseInt(document.getElementById('newExerciseTarget').value, 10) || 4;
+
+  const icons = {
+    sets: '🏋️',
+    reps: '💥'
+  };
+
+  const newEx = {
+    id: 'ex_' + Date.now(),
+    name,
+    icon: icons[type] || '💪',
+    type,
+    target
+  };
+
+  currentUser.exercises.push(newEx);
+  saveCurrentUser();
+  closeExerciseModal();
+  renderPushups();
+}
+
+function deleteExercise(exId) {
+  if (!currentUser) return;
+  if (currentUser.exercises.length <= 1) {
+    alert('Должно остаться хотя бы одно упражнение в программе!');
+    return;
+  }
+  if (confirm('Удалить это упражнение из программы?')) {
+    currentUser.exercises = currentUser.exercises.filter(e => e.id !== exId);
+    saveCurrentUser();
+    renderPushups();
+  }
+}
+
+// Change Target Modal
+function openChangeTargetModalEx(exId, currentVal, type) {
+  document.getElementById('editExerciseId').value = exId;
+  document.getElementById('targetModalLabel').textContent = type === 'sets' ? 'Цель (подходов)' : 'Цель (повторений)';
+  document.getElementById('newTargetInput').value = currentVal;
   document.getElementById('targetModal').classList.remove('hidden');
 }
 
@@ -700,26 +926,26 @@ function closeTargetModal() {
   document.getElementById('targetModal').classList.add('hidden');
 }
 
-function saveNewPushupTarget(e) {
+function saveNewTarget(e) {
   e.preventDefault();
   if (!currentUser) return;
+  const exId = document.getElementById('editExerciseId').value;
   const val = parseInt(document.getElementById('newTargetInput').value, 10);
-  if (val >= 5) {
-    currentUser.pushupTarget = val;
-    const todayKey = getTodayDateKey();
-    currentUser.pushupLogs[todayKey].target = val;
+  if (val >= 1) {
+    const ex = currentUser.exercises.find(e => e.id === exId);
+    if (ex) ex.target = val;
     saveCurrentUser();
     closeTargetModal();
     renderPushups();
   }
 }
 
-function renderPushupHistory() {
+function renderWorkoutHistory() {
   const list = document.getElementById('pushupHistoryList');
   if (!list || !currentUser) return;
   list.innerHTML = '';
 
-  const logs = currentUser.pushupLogs || {};
+  const logs = currentUser.workoutLogs || {};
   const sortedDates = Object.keys(logs).sort().reverse().slice(0, 7);
 
   if (sortedDates.length === 0) {
@@ -732,13 +958,13 @@ function renderPushupHistory() {
     const item = document.createElement('div');
     item.className = 'history-item';
 
-    const isSuccess = entry.done >= entry.target;
+    const isSuccess = entry.status === 'success' || entry.penalty === 0;
     const dateFormatted = new Date(dateKey).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 
     item.innerHTML = `
       <span class="history-date">${dateFormatted}</span>
       <span class="history-stats ${isSuccess ? 'text-green' : 'text-red'}">
-        ${entry.done} / ${entry.target} отжиманий ${isSuccess ? '✓' : '(Штраф 5 000 сум)'}
+        ${isSuccess ? '✓ Тренировка выполнена (0 сум)' : '✕ Пропуск (Штраф 5 000 сум)'}
       </span>
     `;
     list.appendChild(item);
@@ -782,17 +1008,19 @@ function renderPenalties() {
 
   for (let day = 1; day <= maxDayToCheck; day++) {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const log = currentUser.pushupLogs ? currentUser.pushupLogs[dateKey] : null;
+    const workoutLog = currentUser.workoutLogs ? currentUser.workoutLogs[dateKey] : null;
+    const pushupLog = currentUser.pushupLogs ? currentUser.pushupLogs[dateKey] : null;
+    const isSuccess = (workoutLog && workoutLog.status === 'success') || (pushupLog && pushupLog.done >= pushupLog.target);
 
     const row = document.createElement('div');
     const isToday = isCurrentMonth && day === today.getDate();
 
-    if (log && log.done >= log.target) {
+    if (isSuccess) {
       successDays++;
       row.className = 'month-day-row success';
       row.innerHTML = `
         <span>${day} ${monthNames[month]} ${isToday ? '(Сегодня)' : ''}</span>
-        <span class="text-green">✓ ${log.done} отж. (0 сум)</span>
+        <span class="text-green">✓ Тренировка закрыта (0 сум)</span>
       `;
     } else {
       if (isToday) {

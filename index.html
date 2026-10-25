@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -132,75 +132,51 @@
           </div>
         </section>
 
-        <!-- TAB 2: PUSH-UPS (Отжимания) -->
+        <!-- TAB 2: WORKOUT / УПРАЖНЕНИЯ (Отжимания, Жим лежа, Трицепс и др.) -->
         <section id="viewPushups" class="app-view hidden">
           <!-- Streak & Target Banner -->
-          <div class="stats-grid">
+          <div class="stats-grid three-col">
             <div class="stat-card streak-card">
               <div class="stat-icon">🔥</div>
               <div class="stat-val" id="streakCount">0</div>
               <div class="stat-lbl">Дней стрик</div>
             </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎯</div>
+              <div class="stat-val text-green" id="workoutExercisesDone">0/3</div>
+              <div class="stat-lbl">Упражнений</div>
+            </div>
             <div class="stat-card penalty-stat-card">
               <div class="stat-icon">⚠️</div>
-              <div class="stat-val" id="todayPenaltyStatus">0 сум</div>
+              <div class="stat-val" id="todayPenaltyStatus">5 000 сум</div>
               <div class="stat-lbl">Штраф сегодня</div>
             </div>
           </div>
 
-          <!-- Today's Pushup Mission -->
-          <div class="section-card pushup-mission-card">
-            <div class="mission-header">
-              <div>
-                <span class="badge-tag pushup-tag">Цель на сегодня</span>
-                <h3 class="mission-title">Прогрессивная нагрузка</h3>
-              </div>
-              <button class="edit-target-btn" onclick="openChangeTargetModal()">Изменить цель ✏️</button>
-            </div>
-
-            <!-- Big Pushup Counter -->
-            <div class="pushup-counter-box">
-              <div class="counter-display">
-                <span class="count-done" id="pushupsDone">0</span>
-                <span class="count-divider">/</span>
-                <span class="count-target" id="pushupsTarget">50</span>
-              </div>
-              <div class="counter-sub">отжиманий сделано</div>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="progress-bar-container">
-              <div class="progress-bar-fill" id="pushupProgressBar" style="width: 0%"></div>
-            </div>
-            <div class="progress-status-row">
-              <span id="pushupStatusText">Нужно поднажать!</span>
-              <span id="pushupPercentText">0%</span>
-            </div>
-
-            <!-- Quick Add Reps Buttons -->
-            <div class="quick-add-grid">
-              <button class="rep-btn" onclick="addPushupReps(10)">+10</button>
-              <button class="rep-btn" onclick="addPushupReps(15)">+15</button>
-              <button class="rep-btn" onclick="addPushupReps(20)">+20</button>
-              <button class="rep-btn rep-all-btn" onclick="completeAllPushups()">Завершить все! 🎯</button>
-            </div>
-
-            <!-- Custom Input -->
-            <div class="custom-rep-input-row">
-              <input type="number" id="customRepsInput" placeholder="Свой подход..." min="1" max="500">
-              <button class="custom-add-btn" onclick="addCustomReps()">Записать</button>
-              <button class="reset-today-btn" title="Сбросить на 0" onclick="resetTodayPushups()">↺</button>
-            </div>
-          </div>
-
-          <!-- Daily Status Resolution -->
+          <!-- Daily Workout Verdict & Finish Button -->
           <div class="day-verdict-box" id="dayVerdictBox">
-            <!-- Rendered by JS: either 'Цель достигнута - красавчик!' or 'Пропуск дня: Штраф 5000 сум' -->
+            <!-- Rendered by JS -->
           </div>
 
-          <!-- Recent Push-up History -->
+          <!-- Exercises Header with Add Button -->
+          <div class="schedule-actions-row">
+            <span class="section-title">Программа тренировки</span>
+            <button class="add-slot-btn" onclick="openAddExerciseModal()">+ Упражнение</button>
+          </div>
+
+          <!-- Exercises Dynamic Container -->
+          <div class="exercises-container" id="exercisesContainer">
+            <!-- Rendered dynamically by JS: Push-ups, Bench Press, Triceps dumbbells, etc. -->
+          </div>
+
+          <!-- Finish All Button -->
+          <button class="primary-btn complete-workout-big-btn" onclick="completeFullWorkoutToday()">
+            🏁 Завершить всю тренировку дня!
+          </button>
+
+          <!-- Recent Workout History -->
           <div class="section-card history-card">
-            <h3>История за последние 7 дней</h3>
+            <h3>История тренировок за 7 дней</h3>
             <div class="history-list" id="pushupHistoryList">
               <!-- Rendered by JS -->
             </div>
@@ -320,7 +296,7 @@
         </button>
         <button class="nav-tab-item" onclick="switchView('viewPushups')">
           <span class="tab-icon">💪</span>
-          <span class="tab-label">Отжимания</span>
+          <span class="tab-label">Тренировка</span>
         </button>
         <button class="nav-tab-item" onclick="switchView('viewPenalties')">
           <span class="tab-icon">💰</span>
@@ -373,20 +349,77 @@
       </div>
     </div>
 
-    <!-- MODAL: CHANGE TARGET PUSHUPS -->
+    <!-- MODAL: CHANGE TARGET -->
     <div id="targetModal" class="modal-overlay hidden">
       <div class="modal-sheet">
         <div class="modal-handle"></div>
-        <h3>Изменить цель отжиманий</h3>
-        <p class="modal-sub">Каждый раз повышай планку, чтобы расти в результатах!</p>
-        <form onsubmit="saveNewPushupTarget(event)">
+        <h3>Изменить цель</h3>
+        <p class="modal-sub">Повышай планку для прогрессивной перегрузки!</p>
+        <form onsubmit="saveNewTarget(event)">
+          <input type="hidden" id="editExerciseId">
           <div class="input-group">
-            <label>Цель на сегодня (отжиманий)</label>
-            <input type="number" id="newTargetInput" min="5" max="1000" required>
+            <label id="targetModalLabel">Цель (повторений или подходов)</label>
+            <input type="number" id="newTargetInput" min="1" max="1000" required>
           </div>
           <div class="modal-buttons">
             <button type="button" class="cancel-btn" onclick="closeTargetModal()">Отмена</button>
-            <button type="submit" class="primary-btn">Установить</button>
+            <button type="submit" class="primary-btn">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: ADD CUSTOM EXERCISE -->
+    <div id="exerciseModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3>Новое упражнение</h3>
+        <p class="modal-sub">Добавь упражнение в программу (жим, гантели, трицепс и др.)</p>
+        <form id="exerciseForm" onsubmit="saveCustomExercise(event)">
+          <div class="input-group">
+            <label>Название упражнения</label>
+            <input type="text" id="newExerciseName" placeholder="Например: Жим лежа на наклонной" required>
+          </div>
+          <div class="input-group">
+            <label>Тип учета</label>
+            <select id="newExerciseType" onchange="toggleExerciseTypeFields()">
+              <option value="sets">🏋️ Подходы с весом (Вес кг × Повторения)</option>
+              <option value="reps">💥 Общее число повторений (как отжимания)</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label id="newExTargetLabel">Целевое количество подходов</label>
+            <input type="number" id="newExerciseTarget" value="4" min="1" max="500" required>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeExerciseModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Добавить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: ADD SET (ПОДХОД) -->
+    <div id="setModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 id="setModalExerciseTitle">Записать подход</h3>
+        <p class="modal-sub">Укажи рабочий вес и количество чистых повторений</p>
+        <form onsubmit="saveExerciseSet(event)">
+          <input type="hidden" id="setExerciseId">
+          <div class="input-row-2">
+            <div class="input-group">
+              <label>Вес (кг)</label>
+              <input type="number" id="setWeightInput" step="0.5" placeholder="60" required>
+            </div>
+            <div class="input-group">
+              <label>Повторений (раз)</label>
+              <input type="number" id="setRepsInput" min="1" placeholder="10" required>
+            </div>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeSetModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Записать подход 💪</button>
           </div>
         </form>
       </div>
@@ -394,6 +427,6 @@
 
   </div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
