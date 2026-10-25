@@ -305,11 +305,17 @@ function switchView(viewId) {
   const views = ['viewSchedule', 'viewPushups', 'viewPenalties', 'viewProfile'];
   views.forEach(v => {
     const el = document.getElementById(v);
-    if (el) el.classList.add('hidden');
+    if (el) {
+      el.classList.remove('active');
+      el.classList.add('hidden');
+    }
   });
 
   const targetView = document.getElementById(viewId);
-  if (targetView) targetView.classList.remove('hidden');
+  if (targetView) {
+    targetView.classList.add('active');
+    targetView.classList.remove('hidden');
+  }
 
   // Bottom tab buttons active state
   const tabs = document.querySelectorAll('.nav-tab-item');
