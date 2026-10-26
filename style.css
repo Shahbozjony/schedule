@@ -256,6 +256,49 @@ body {
   line-height: 1.6;
 }
 
+.saved-accounts-box {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.saved-acc-title {
+  font-size: 11px;
+  color: #a5b4fc;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.saved-acc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.saved-acc-btn {
+  background: var(--primary);
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.saved-acc-btn:active {
+  opacity: 0.8;
+}
+
 /* =========================================================
    TOP APP BAR & USER HEADER
    ========================================================= */

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'discipline-os-v6';
+const CACHE_NAME = 'discipline-os-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

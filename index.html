@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -47,6 +47,12 @@
           </div>
           <button type="submit" class="primary-btn pulse">Войти в аккаунт</button>
           <div id="loginError" class="auth-error hidden"></div>
+
+          <!-- Quick login for saved accounts on this device -->
+          <div id="savedAccountsContainer" class="saved-accounts-box hidden">
+            <div class="saved-acc-title">Аккаунты на этом устройстве:</div>
+            <div id="savedAccountsList" style="display: flex; flex-direction: column; gap: 6px;"></div>
+          </div>
         </form>
 
         <!-- Register Form -->
@@ -590,6 +596,6 @@
 
   </div>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

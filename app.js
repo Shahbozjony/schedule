@@ -74,14 +74,19 @@ function saveAllUsers(users) {
 }
 
 function checkAuthSession() {
-  const currentUsername = localStorage.getItem(CURRENT_USER_KEY);
-  const users = getAllUsers();
+  try {
+    const currentUsername = localStorage.getItem(CURRENT_USER_KEY);
+    const users = getAllUsers();
 
-  if (currentUsername && users[currentUsername]) {
-    currentUser = users[currentUsername];
-    ensureUserDefaults();
-    showMainScreen();
-  } else {
+    if (currentUsername && users[currentUsername]) {
+      currentUser = users[currentUsername];
+      ensureUserDefaults();
+      showMainScreen();
+    } else {
+      showAuthScreen();
+    }
+  } catch (e) {
+    console.error('checkAuthSession error:', e);
     showAuthScreen();
   }
 }
@@ -122,12 +127,90 @@ function switchAuthTab(tab) {
     regForm.classList.add('hidden');
     tabLoginBtn.classList.add('active');
     tabRegisterBtn.classList.remove('active');
+    renderSavedAccounts();
   } else {
     loginForm.classList.add('hidden');
     regForm.classList.remove('hidden');
     tabLoginBtn.classList.remove('active');
     tabRegisterBtn.classList.add('active');
   }
+}
+
+function renderSavedAccounts() {
+  const users = getAllUsers();
+  const container = document.getElementById('savedAccountsContainer');
+  const list = document.getElementById('savedAccountsList');
+  if (!container || !list) return;
+
+  const usernames = Object.keys(users);
+  if (usernames.length === 0) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+  list.innerHTML = '';
+
+  usernames.forEach(uname => {
+    const u = users[uname];
+    const row = document.createElement('div');
+    row.className = 'saved-acc-item';
+    row.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">👤</span>
+        <div>
+          <div style="font-size: 13px; font-weight: 700;">${escapeHtml(u.name || uname)}</div>
+          <div style="font-size: 11px; color: var(--text-dim);">@${uname}</div>
+        </div>
+      </div>
+      <button type="button" class="saved-acc-btn" onclick="quickLoginAs('${uname}')">Войти в 1 клик</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function quickLoginAs(username) {
+  const users = getAllUsers();
+  if (users[username]) {
+    currentUser = users[username];
+    ensureUserDefaults();
+    localStorage.setItem(CURRENT_USER_KEY, username);
+    showMainScreen();
+  }
+}
+
+function handleLogin(e) {
+  e.preventDefault();
+  const usernameInput = document.getElementById('loginUsername').value.trim();
+  const username = usernameInput.toLowerCase();
+  const password = document.getElementById('loginPassword').value;
+  const loginError = document.getElementById('loginError');
+
+  const users = getAllUsers();
+  let user = users[username];
+  if (!user) {
+    const foundKey = Object.keys(users).find(k => k.toLowerCase() === username || (users[k].name && users[k].name.toLowerCase() === username));
+    if (foundKey) user = users[foundKey];
+  }
+
+  if (!user) {
+    showError(loginError, 'Аккаунт с таким логином не найден на этом устройстве');
+    renderSavedAccounts();
+    return;
+  }
+
+  if (user.password !== password) {
+    showError(loginError, 'Неверный пароль. Нажмите "Войти в 1 клик" на карточке аккаунта ниже');
+    renderSavedAccounts();
+    return;
+  }
+
+  currentUser = user;
+  ensureUserDefaults();
+  localStorage.setItem(CURRENT_USER_KEY, user.username);
+
+  document.getElementById('loginForm').reset();
+  showMainScreen();
 }
 
 function handleRegister(e) {
@@ -257,26 +340,31 @@ function showAuthScreen() {
     main.classList.remove('active');
     main.classList.add('hidden');
   }
+  renderSavedAccounts();
 }
 
 function showMainScreen() {
-  const auth = document.getElementById('authScreen');
-  const main = document.getElementById('mainScreen');
-  if (auth) {
-    auth.classList.remove('active');
-    auth.classList.add('hidden');
-  }
-  if (main) {
-    main.classList.add('active');
-    main.classList.remove('hidden');
-  }
+  try {
+    const auth = document.getElementById('authScreen');
+    const main = document.getElementById('mainScreen');
+    if (auth) {
+      auth.classList.remove('active');
+      auth.classList.add('hidden');
+    }
+    if (main) {
+      main.classList.add('active');
+      main.classList.remove('hidden');
+    }
 
-  ensureUserDefaults();
-  renderUserProfile();
-  renderSchedule();
-  renderPushups();
-  renderPenalties();
-  renderReport();
+    ensureUserDefaults();
+    renderUserProfile();
+    renderSchedule();
+    renderPushups();
+    renderPenalties();
+    renderReport();
+  } catch (err) {
+    console.error('Error in showMainScreen:', err);
+  }
 }
 
 /* =========================================================
@@ -787,6 +875,9 @@ function initUserExercises() {
       penalty: 5000,
       exercises: {}
     };
+  }
+  if (!currentUser.workoutLogs[todayKey].exercises) {
+    currentUser.workoutLogs[todayKey].exercises = {};
   }
 
   currentUser.exercises.forEach(ex => {
