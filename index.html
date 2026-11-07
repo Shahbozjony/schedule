@@ -14,14 +14,82 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=19">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="app">
-    <!-- MAIN APP SCREEN (Прямой доступ без логина и пароля) -->
+    <!-- AUTH SCREEN: LOGIN & REGISTER (ЛОГИН И ПАРОЛЬ) -->
+    <div id="authScreen" class="screen hidden">
+      <div class="auth-container">
+        <div class="auth-header">
+          <div class="logo-badge">⚡</div>
+          <h1>Дисциплина OS</h1>
+          <p class="subtitle">Вход в систему расписания, книг и тренировок</p>
+        </div>
+
+        <div class="auth-tabs">
+          <button type="button" class="tab-btn active" id="tabBtnLogin" onclick="switchAuthTab('login')">Вход</button>
+          <button type="button" class="tab-btn" id="tabBtnRegister" onclick="switchAuthTab('register')">Регистрация</button>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form id="loginForm" class="auth-form" onsubmit="handleLoginSubmit(event)">
+          <div class="auth-error hidden" id="loginError"></div>
+          
+          <div class="input-group">
+            <label>Логин / Username</label>
+            <input type="text" id="loginUsername" placeholder="shahboz" required autocomplete="username">
+          </div>
+
+          <div class="input-group">
+            <label>Пароль</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" class="primary-btn">Войти в систему 🚀</button>
+
+          <p class="auth-footer-note">
+            🔑 По умолчанию: логин <b>shahboz</b> • пароль <b>1234</b>
+          </p>
+        </form>
+
+        <!-- REGISTER FORM (ДЛЯ ДРУЗЕЙ) -->
+        <form id="registerForm" class="auth-form hidden" onsubmit="handleRegisterSubmit(event)">
+          <div class="auth-error hidden" id="regError"></div>
+
+          <div class="input-group">
+            <label>Ваше имя</label>
+            <input type="text" id="regName" placeholder="Например: Алишер" required>
+          </div>
+
+          <div class="input-group">
+            <label>Логин (только латиница и цифры)</label>
+            <input type="text" id="regUsername" placeholder="alisher_fit" required autocomplete="username">
+          </div>
+
+          <div class="input-group">
+            <label>Пароль</label>
+            <input type="password" id="regPassword" placeholder="Придумайте пароль" required autocomplete="new-password">
+          </div>
+
+          <div class="input-group">
+            <label>Повторите пароль (подтверждение)</label>
+            <input type="password" id="regConfirmPassword" placeholder="Повторите пароль" required autocomplete="new-password">
+          </div>
+
+          <button type="submit" class="primary-btn">Создать профиль ✨</button>
+
+          <p class="auth-footer-note">
+            У каждого пользователя своё расписание, книги и личный прогресс достижений!
+          </p>
+        </form>
+      </div>
+    </div>
+
+    <!-- MAIN APP SCREEN -->
     <div id="mainScreen" class="screen">
       <!-- Top App Bar -->
       <header class="top-bar">
@@ -34,7 +102,11 @@
         </div>
         <div class="top-bar-actions">
           <div class="live-clock" id="liveClock">23:55</div>
-          <button class="top-avatar-btn" onclick="openProfileModal()" title="Настройки аккаунта и Telegram">
+          <button class="top-avatar-btn" onclick="openAchievementsModal()" title="Достижения Steam (🏆)" style="position: relative;">
+            🏆
+            <span class="ach-count-badge" id="topAchBadge">0</span>
+          </button>
+          <button class="top-avatar-btn" onclick="openProfileModal()" title="Настройки аккаунта и профиля">
             ⚙️
           </button>
         </div>
@@ -543,40 +615,55 @@
           <div class="member-since" id="memberSince">В системе с 2026 года</div>
         </div>
 
-        <!-- TELEGRAM BOT & CLOUDFLARE INTEGRATION -->
-        <div class="section-card" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-color: rgba(56, 189, 248, 0.3);">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <span style="font-size: 22px;">🤖</span>
+        <!-- SECURITY & ACCOUNT SETTINGS (СМЕНА ЛОГИНА И ПАРОЛЯ С ДВОЙНЫМ ВВОДОМ) -->
+        <div class="section-card security-card" style="margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <span style="font-size: 22px;">🔐</span>
             <div>
-              <h4 style="font-size: 15px; font-weight: 700; color: #38bdf8;">Telegram-бот (Cloudflare)</h4>
-              <p style="font-size: 11px; color: var(--text-muted);">Отправка напоминаний о блоках и штрафах прямо в Telegram</p>
+              <h4 style="font-size: 15px; font-weight: 700;">Безопасность и аккаунт</h4>
+              <p style="font-size: 11px; color: var(--text-muted);">Изменение логина и смена пароля с подтверждением</p>
             </div>
           </div>
-          
-          <div class="input-group" style="margin-bottom: 10px;">
-            <label>Токен бота или Cloudflare Worker URL</label>
-            <input type="text" id="tgBotToken" placeholder="123456789:ABC... или https://bot.workers.dev/notify">
-          </div>
 
-          <div class="input-group" style="margin-bottom: 10px;">
-            <label>Ваш Telegram Chat ID</label>
-            <input type="text" id="tgChatId" placeholder="Например: 987654321">
-          </div>
+          <form onsubmit="handleProfileSecuritySave(event)">
+            <div class="input-group" style="margin-bottom: 10px;">
+              <label>Логин / Username</label>
+              <input type="text" id="profileEditUsername" placeholder="shahboz" required autocomplete="username">
+            </div>
 
-          <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
-              <input type="checkbox" id="tgNotifyBlocks" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
-              Присылать напоминание в начале каждого блока
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
-              <input type="checkbox" id="tgNotifyPenalties" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
-              Присылать вечерний отчет по штрафам (в 22:00)
-            </label>
-          </div>
+            <div class="input-group" style="margin-bottom: 10px;">
+              <label>Отображаемое имя</label>
+              <input type="text" id="profileEditDisplayName" placeholder="Шахбоз" required>
+            </div>
 
-          <div style="display: flex; gap: 8px;">
-            <button type="button" class="primary-btn" onclick="saveTelegramSettings()" style="flex: 1; padding: 10px;">Сохранить бота</button>
-            <button type="button" class="cancel-btn" onclick="sendTestTelegramMessage()" style="padding: 10px;">🔔 Тест</button>
+            <div style="margin: 14px 0 10px 0; padding-top: 10px; border-top: 1px dashed var(--border);">
+              <span style="font-size: 13px; font-weight: 700; color: var(--primary);">Смена пароля</span>
+              <p style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">
+                Оставьте поля пустыми, если не хотите менять пароль.
+              </p>
+            </div>
+
+            <div class="input-group" style="margin-bottom: 10px;">
+              <label>Новый пароль</label>
+              <input type="password" id="profileNewPass" placeholder="Новый пароль" autocomplete="new-password">
+            </div>
+
+            <div class="input-group" style="margin-bottom: 12px;">
+              <label>Повторите новый пароль (подтверждение)</label>
+              <input type="password" id="profileConfirmPass" placeholder="Повторите новый пароль еще раз" autocomplete="new-password">
+            </div>
+
+            <div class="auth-error hidden" id="profileSecurityError" style="margin-bottom: 10px;"></div>
+
+            <button type="submit" class="primary-btn" style="width: 100%; padding: 12px;">
+              💾 Сохранить логин и пароль
+            </button>
+          </form>
+
+          <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06);">
+            <button type="button" class="action-btn-row" style="width: 100%; color: var(--accent-red); justify-content: center; font-weight: 700;" onclick="handleLogout()">
+              <span>🚪 Выйти из аккаунта</span>
+            </button>
           </div>
         </div>
 
@@ -860,8 +947,51 @@
       </div>
     </div>
 
+    <!-- MODAL: STEAM ACHIEVEMENTS SHOWCASE (ДОСТИЖЕНИЯ КАК В STEAM) -->
+    <div id="achievementsModal" class="modal-overlay hidden">
+      <div class="modal-sheet achievements-sheet" style="max-height: 92vh; overflow-y: auto;">
+        <div class="modal-handle"></div>
+        
+        <div class="steam-hero-card">
+          <div class="steam-hero-top">
+            <div>
+              <span class="badge-tag steam-badge-tag">🏆 Steam Achievements</span>
+              <h2 style="font-size: 18px; margin-top: 4px;">Достижения и трофеи</h2>
+            </div>
+            <div class="steam-trophy-counter" id="steamTrophyCounter">
+              0 / 18
+            </div>
+          </div>
+          <p class="card-desc" style="margin-top: 4px; font-size: 12px;">
+            Выполняй цели по книгам, ACCA, тренировкам и соревнуйся с друзьями!
+          </p>
+
+          <div class="today-rep-bar-bg" style="margin-top: 10px; height: 8px;">
+            <div id="steamOverallProgressBar" class="today-rep-bar-fill" style="width: 0%; background: linear-gradient(90deg, #f59e0b, #ec4899, #8b5cf6);"></div>
+          </div>
+        </div>
+
+        <!-- Filter tabs for achievements -->
+        <div class="day-filter-bar" style="margin: 10px 0 14px 0; overflow-x: auto; white-space: nowrap;">
+          <button class="day-filter-btn active" id="achFilter_all" onclick="setAchievementFilter('all')">Все (18)</button>
+          <button class="day-filter-btn" id="achFilter_reading" onclick="setAchievementFilter('reading')">📚 Книги</button>
+          <button class="day-filter-btn" id="achFilter_study" onclick="setAchievementFilter('study')">📑 ACCA</button>
+          <button class="day-filter-btn" id="achFilter_sport" onclick="setAchievementFilter('sport')">💪 Спорт</button>
+          <button class="day-filter-btn" id="achFilter_discipline" onclick="setAchievementFilter('discipline')">⚡ Дисциплина</button>
+          <button class="day-filter-btn" id="achFilter_unlocked" onclick="setAchievementFilter('unlocked')">✓ Открытые</button>
+        </div>
+
+        <!-- Container for rendered achievement cards -->
+        <div class="steam-achievements-list" id="steamAchievementsList">
+          <!-- Rendered dynamically by JS -->
+        </div>
+
+        <button type="button" class="cancel-btn" style="width: 100%; margin-top: 16px;" onclick="closeAchievementsModal()">Закрыть витрину</button>
+      </div>
+    </div>
+
   </div>
 
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
