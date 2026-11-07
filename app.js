@@ -883,17 +883,465 @@ function initLiveClock() {
   setInterval(update, 1000);
 }
 
+const DISCIPLINE_RANKS = [
+  {
+    id: 'legend',
+    league: 'Легенда Олимпа',
+    leagueIcon: '👑',
+    division: 'MAX',
+    title: 'Легенда Олимпа',
+    fullTitle: '👑 Легенда Олимпа (MAX)',
+    symbol: '👑',
+    prefix: '👑',
+    badgeTag: '👑 MAX (60+)',
+    min: 60,
+    max: 999,
+    pts: 3000,
+    frameClass: 'lvl-frame-6',
+    color: '#f43f5e',
+    desc: 'Абсолютный максимум (все 60 достижений). Пик человеческой воли и дисциплины.'
+  },
+  {
+    id: 'gm_2950',
+    league: 'Грандмастер',
+    leagueIcon: '💎',
+    division: '2950',
+    title: 'Грандмастер 2950',
+    fullTitle: '💎 Грандмастер 2950',
+    symbol: '💎',
+    prefix: '💎',
+    badgeTag: '💎 2950 PTS',
+    min: 57,
+    max: 59,
+    pts: 2950,
+    frameClass: 'lvl-frame-5',
+    color: '#38bdf8',
+    desc: 'Пре-Олимп: 57-59 достижений. До вершины остался последний шаг.'
+  },
+  {
+    id: 'gm_2900',
+    league: 'Грандмастер',
+    leagueIcon: '💎',
+    division: '2900',
+    title: 'Грандмастер 2900',
+    fullTitle: '💎 Грандмастер 2900',
+    symbol: '💎',
+    prefix: '💎',
+    badgeTag: '💎 2900 PTS',
+    min: 54,
+    max: 56,
+    pts: 2900,
+    frameClass: 'lvl-frame-5',
+    color: '#38bdf8',
+    desc: 'Высшая элита Грандмастеров: 54-56 достижений.'
+  },
+  {
+    id: 'gm_2850',
+    league: 'Грандмастер',
+    leagueIcon: '💎',
+    division: '2850',
+    title: 'Грандмастер 2850',
+    fullTitle: '💎 Грандмастер 2850',
+    symbol: '💎',
+    prefix: '💎',
+    badgeTag: '💎 2850 PTS',
+    min: 51,
+    max: 53,
+    pts: 2850,
+    frameClass: 'lvl-frame-5',
+    color: '#38bdf8',
+    desc: 'Элитный гроссмейстер дисциплины: 51-53 достижения.'
+  },
+  {
+    id: 'gm_2800',
+    league: 'Грандмастер',
+    leagueIcon: '💎',
+    division: '2800',
+    title: 'Грандмастер 2800',
+    fullTitle: '💎 Грандмастер 2800',
+    symbol: '💎',
+    prefix: '💎',
+    badgeTag: '💎 2800 PTS',
+    min: 48,
+    max: 50,
+    pts: 2800,
+    frameClass: 'lvl-frame-5',
+    color: '#38bdf8',
+    desc: 'Статус Грандмастера: 48-50 достижений.'
+  },
+  {
+    id: 'gm_2750',
+    league: 'Грандмастер',
+    leagueIcon: '💎',
+    division: '2750',
+    title: 'Грандмастер 2750',
+    fullTitle: '💎 Грандмастер 2750',
+    symbol: '💎',
+    prefix: '💎',
+    badgeTag: '💎 2750 PTS',
+    min: 45,
+    max: 47,
+    pts: 2750,
+    frameClass: 'lvl-frame-5',
+    color: '#38bdf8',
+    desc: 'Посвящение в Грандмастеры: 45-47 достижений.'
+  },
+  // ТИТАНЫ (ЗОЛОТОЙ ОГОНЬ)
+  {
+    id: 'titan_1',
+    league: 'Титан',
+    leagueIcon: '🔥',
+    division: 'I',
+    title: 'Титан I',
+    fullTitle: '🔥 Титан I',
+    symbol: '🔥',
+    prefix: '🔥',
+    badgeTag: '🔥 Титан I',
+    min: 42,
+    max: 44,
+    pts: 2700,
+    frameClass: 'lvl-frame-4',
+    color: '#fbbf24',
+    desc: 'Высший дивизион Титанов: 42-44 достижения.'
+  },
+  {
+    id: 'titan_2',
+    league: 'Титан',
+    leagueIcon: '🔥',
+    division: 'II',
+    title: 'Титан II',
+    fullTitle: '🔥 Титан II',
+    symbol: '🔥',
+    prefix: '🔥',
+    badgeTag: '🔥 Титан II',
+    min: 39,
+    max: 41,
+    pts: 2650,
+    frameClass: 'lvl-frame-4',
+    color: '#fbbf24',
+    desc: 'Несокрушимая стойкость: 39-41 достижение.'
+  },
+  {
+    id: 'titan_3',
+    league: 'Титан',
+    leagueIcon: '🔥',
+    division: 'III',
+    title: 'Титан III',
+    fullTitle: '🔥 Титан III',
+    symbol: '🔥',
+    prefix: '🔥',
+    badgeTag: '🔥 Титан III',
+    min: 36,
+    max: 38,
+    pts: 2600,
+    frameClass: 'lvl-frame-4',
+    color: '#fbbf24',
+    desc: 'Золотой стандарт режима: 36-38 достижений.'
+  },
+  {
+    id: 'titan_4',
+    league: 'Титан',
+    leagueIcon: '🔥',
+    division: 'IV',
+    title: 'Титан IV',
+    fullTitle: '🔥 Титан IV',
+    symbol: '🔥',
+    prefix: '🔥',
+    badgeTag: '🔥 Титан IV',
+    min: 33,
+    max: 35,
+    pts: 2550,
+    frameClass: 'lvl-frame-4',
+    color: '#fbbf24',
+    desc: 'Закалённый боец дисциплины: 33-35 достижений.'
+  },
+  {
+    id: 'titan_5',
+    league: 'Титан',
+    leagueIcon: '🔥',
+    division: 'V',
+    title: 'Титан V',
+    fullTitle: '🔥 Титан V',
+    symbol: '🔥',
+    prefix: '🔥',
+    badgeTag: '🔥 Титан V',
+    min: 30,
+    max: 32,
+    pts: 2500,
+    frameClass: 'lvl-frame-4',
+    color: '#fbbf24',
+    desc: 'Вход в Лигу Титанов: 30-32 достижения.'
+  },
+  // ЦЕНТУРИОНЫ OS (СЕРЕБРЯНЫЙ НЕОН)
+  {
+    id: 'centurion_1',
+    league: 'Центурион OS',
+    leagueIcon: '⚡',
+    division: 'I',
+    title: 'Центурион I',
+    fullTitle: '⚡ Центурион I',
+    symbol: '⚡',
+    prefix: '⚡',
+    badgeTag: '⚡ Центурион I',
+    min: 27,
+    max: 29,
+    pts: 2400,
+    frameClass: 'lvl-frame-3',
+    color: '#cbd5e1',
+    desc: 'Магистр серебряной лиги: 27-29 достижений.'
+  },
+  {
+    id: 'centurion_2',
+    league: 'Центурион OS',
+    leagueIcon: '⚡',
+    division: 'II',
+    title: 'Центурион II',
+    fullTitle: '⚡ Центурион II',
+    symbol: '⚡',
+    prefix: '⚡',
+    badgeTag: '⚡ Центурион II',
+    min: 25,
+    max: 26,
+    pts: 2300,
+    frameClass: 'lvl-frame-3',
+    color: '#cbd5e1',
+    desc: 'Высокая концентрация: 25-26 достижений.'
+  },
+  {
+    id: 'centurion_3',
+    league: 'Центурион OS',
+    leagueIcon: '⚡',
+    division: 'III',
+    title: 'Центурион III',
+    fullTitle: '⚡ Центурион III',
+    symbol: '⚡',
+    prefix: '⚡',
+    badgeTag: '⚡ Центурион III',
+    min: 22,
+    max: 24,
+    pts: 2200,
+    frameClass: 'lvl-frame-3',
+    color: '#cbd5e1',
+    desc: 'Крепкая привычка побеждать: 22-24 достижения.'
+  },
+  {
+    id: 'centurion_4',
+    league: 'Центурион OS',
+    leagueIcon: '⚡',
+    division: 'IV',
+    title: 'Центурион IV',
+    fullTitle: '⚡ Центурион IV',
+    symbol: '⚡',
+    prefix: '⚡',
+    badgeTag: '⚡ Центурион IV',
+    min: 19,
+    max: 21,
+    pts: 2100,
+    frameClass: 'lvl-frame-3',
+    color: '#cbd5e1',
+    desc: 'Преодоление рутины: 19-21 достижение.'
+  },
+  {
+    id: 'centurion_5',
+    league: 'Центурион OS',
+    leagueIcon: '⚡',
+    division: 'V',
+    title: 'Центурион V',
+    fullTitle: '⚡ Центурион V',
+    symbol: '⚡',
+    prefix: '⚡',
+    badgeTag: '⚡ Центурион V',
+    min: 16,
+    max: 18,
+    pts: 2000,
+    frameClass: 'lvl-frame-3',
+    color: '#cbd5e1',
+    desc: 'Вход в Лигу Центурионов с неоновым свечением: 16-18 достижений.'
+  },
+  // СТРАЖИ ВОЛИ (БРОНЗА)
+  {
+    id: 'guardian_1',
+    league: 'Страж Воли',
+    leagueIcon: '⚔️',
+    division: 'I',
+    title: 'Страж I',
+    fullTitle: '⚔️ Страж I',
+    symbol: '⚔️',
+    prefix: '⚔️',
+    badgeTag: '⚔️ Страж I',
+    min: 14,
+    max: 15,
+    pts: 1900,
+    frameClass: 'lvl-frame-2',
+    color: '#d97706',
+    desc: 'Вершина бронзовой стражи: 14-15 достижений.'
+  },
+  {
+    id: 'guardian_2',
+    league: 'Страж Воли',
+    leagueIcon: '⚔️',
+    division: 'II',
+    title: 'Страж II',
+    fullTitle: '⚔️ Страж II',
+    symbol: '⚔️',
+    prefix: '⚔️',
+    badgeTag: '⚔️ Страж II',
+    min: 12,
+    max: 13,
+    pts: 1800,
+    frameClass: 'lvl-frame-2',
+    color: '#d97706',
+    desc: 'Непреклонная воля: 12-13 достижений.'
+  },
+  {
+    id: 'guardian_3',
+    league: 'Страж Воли',
+    leagueIcon: '⚔️',
+    division: 'III',
+    title: 'Страж III',
+    fullTitle: '⚔️ Страж III',
+    symbol: '⚔️',
+    prefix: '⚔️',
+    badgeTag: '⚔️ Страж III',
+    min: 10,
+    max: 11,
+    pts: 1700,
+    frameClass: 'lvl-frame-2',
+    color: '#d97706',
+    desc: 'Регулярность тренировок и чтения: 10-11 достижений.'
+  },
+  {
+    id: 'guardian_4',
+    league: 'Страж Воли',
+    leagueIcon: '⚔️',
+    division: 'IV',
+    title: 'Страж IV',
+    fullTitle: '⚔️ Страж IV',
+    symbol: '⚔️',
+    prefix: '⚔️',
+    badgeTag: '⚔️ Страж IV',
+    min: 8,
+    max: 9,
+    pts: 1600,
+    frameClass: 'lvl-frame-2',
+    color: '#d97706',
+    desc: 'Уверенное движение вперед: 8-9 достижений.'
+  },
+  {
+    id: 'guardian_5',
+    league: 'Страж Воли',
+    leagueIcon: '⚔️',
+    division: 'V',
+    title: 'Страж V',
+    fullTitle: '⚔️ Страж V',
+    symbol: '⚔️',
+    prefix: '⚔️',
+    badgeTag: '⚔️ Страж V',
+    min: 6,
+    max: 7,
+    pts: 1500,
+    frameClass: 'lvl-frame-2',
+    color: '#d97706',
+    desc: 'Открытие бронзовой рамки профиля: 6-7 достижений.'
+  },
+  // РЕКРУТЫ (НЕОФИТЫ)
+  {
+    id: 'recruit_1',
+    league: 'Рекрут',
+    leagueIcon: '🛡️',
+    division: 'I',
+    title: 'Рекрут I',
+    fullTitle: '🛡️ Рекрут I',
+    symbol: '🛡️',
+    prefix: '🛡️',
+    badgeTag: '🛡️ Рекрут I',
+    min: 5,
+    max: 5,
+    pts: 1400,
+    frameClass: 'lvl-frame-1',
+    color: '#94a3b8',
+    desc: 'Опытный рекрут перед вступлением в Стражи: 5 достижений.'
+  },
+  {
+    id: 'recruit_2',
+    league: 'Рекрут',
+    leagueIcon: '🛡️',
+    division: 'II',
+    title: 'Рекрут II',
+    fullTitle: '🛡️ Рекрут II',
+    symbol: '🛡️',
+    prefix: '🛡️',
+    badgeTag: '🛡️ Рекрут II',
+    min: 4,
+    max: 4,
+    pts: 1300,
+    frameClass: 'lvl-frame-1',
+    color: '#94a3b8',
+    desc: 'Первые устойчивые успехи: 4 достижения.'
+  },
+  {
+    id: 'recruit_3',
+    league: 'Рекрут',
+    leagueIcon: '🛡️',
+    division: 'III',
+    title: 'Рекрут III',
+    fullTitle: '🛡️ Рекрут III',
+    symbol: '🛡️',
+    prefix: '🛡️',
+    badgeTag: '🛡️ Рекрут III',
+    min: 3,
+    max: 3,
+    pts: 1200,
+    frameClass: 'lvl-frame-1',
+    color: '#94a3b8',
+    desc: 'Формирование базовых привычек: 3 достижения.'
+  },
+  {
+    id: 'recruit_4',
+    league: 'Рекрут',
+    leagueIcon: '🛡️',
+    division: 'IV',
+    title: 'Рекрут IV',
+    fullTitle: '🛡️ Рекрут IV',
+    symbol: '🛡️',
+    prefix: '🛡️',
+    badgeTag: '🛡️ Рекрут IV',
+    min: 2,
+    max: 2,
+    pts: 1100,
+    frameClass: 'lvl-frame-1',
+    color: '#94a3b8',
+    desc: 'Первые победы над собой: 2 достижения.'
+  },
+  {
+    id: 'recruit_5',
+    league: 'Рекрут',
+    leagueIcon: '🛡️',
+    division: 'V',
+    title: 'Рекрут V',
+    fullTitle: '🛡️ Рекрут V',
+    symbol: '🛡️',
+    prefix: '🛡️',
+    badgeTag: '🛡️ Рекрут V',
+    min: 0,
+    max: 1,
+    pts: 1000,
+    frameClass: 'lvl-frame-1',
+    color: '#94a3b8',
+    desc: 'Стартовый уровень: 0-1 достижение.'
+  }
+];
+
 function getUserLevelData(user) {
+  const baseRank = DISCIPLINE_RANKS[DISCIPLINE_RANKS.length - 1];
   if (!user) {
     return {
+      ...baseRank,
       level: 1,
-      title: 'Новичок',
-      symbol: '🌱',
-      prefix: '🌱',
-      badgeTag: '🌱 Ур. 1',
-      frameClass: 'lvl-frame-1',
-      color: '#94a3b8',
-      unlockedCount: 0
+      unlockedCount: 0,
+      nextRank: DISCIPLINE_RANKS[DISCIPLINE_RANKS.length - 2],
+      neededForNext: 2,
+      progressToNext: 0
     };
   }
 
@@ -901,73 +1349,35 @@ function getUserLevelData(user) {
   const achievements = getAchievements();
   const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz')).length;
 
-  if (unlockedCount >= 54) {
-    return {
-      level: 6,
-      title: 'Легенда Олимпа',
-      symbol: '👑',
-      prefix: '👑',
-      badgeTag: '👑 MAX (Ур. 6)',
-      frameClass: 'lvl-frame-6',
-      color: '#f43f5e',
-      unlockedCount
-    };
-  } else if (unlockedCount >= 36) {
-    return {
-      level: 5,
-      title: 'Грандмастер',
-      symbol: '💎',
-      prefix: '💎',
-      badgeTag: '💎 Ур. 5',
-      frameClass: 'lvl-frame-5',
-      color: '#38bdf8',
-      unlockedCount
-    };
-  } else if (unlockedCount >= 20) {
-    return {
-      level: 4,
-      title: 'Мастер OS',
-      symbol: '🥇',
-      prefix: '🔥🥇',
-      badgeTag: '🥇 Ур. 4',
-      frameClass: 'lvl-frame-4',
-      color: '#fbbf24',
-      unlockedCount
-    };
-  } else if (unlockedCount >= 9) {
-    return {
-      level: 3,
-      title: 'Воин дисциплины',
-      symbol: '🥈',
-      prefix: '⚡🥈',
-      badgeTag: '🥈 Ур. 3',
-      frameClass: 'lvl-frame-3',
-      color: '#cbd5e1',
-      unlockedCount
-    };
-  } else if (unlockedCount >= 3) {
-    return {
-      level: 2,
-      title: 'Искатель',
-      symbol: '🥉',
-      prefix: '🥉',
-      badgeTag: '🥉 Ур. 2',
-      frameClass: 'lvl-frame-2',
-      color: '#cd7f32',
-      unlockedCount
-    };
-  } else {
-    return {
-      level: 1,
-      title: 'Новичок',
-      symbol: '🌱',
-      prefix: '🌱',
-      badgeTag: '🌱 Ур. 1',
-      frameClass: 'lvl-frame-1',
-      color: '#94a3b8',
-      unlockedCount: 0
-    };
+  let currentRankIndex = DISCIPLINE_RANKS.length - 1;
+  for (let i = 0; i < DISCIPLINE_RANKS.length; i++) {
+    if (unlockedCount >= DISCIPLINE_RANKS[i].min) {
+      currentRankIndex = i;
+      break;
+    }
   }
+
+  const currentRank = DISCIPLINE_RANKS[currentRankIndex];
+  const nextRank = currentRankIndex > 0 ? DISCIPLINE_RANKS[currentRankIndex - 1] : null;
+  const neededForNext = nextRank ? Math.max(0, nextRank.min - unlockedCount) : 0;
+  
+  let progressToNext = 100;
+  if (nextRank) {
+    const span = Math.max(1, nextRank.min - currentRank.min);
+    const doneInSpan = Math.max(0, unlockedCount - currentRank.min);
+    progressToNext = Math.min(100, Math.round((doneInSpan / span) * 100));
+  }
+
+  const levelNum = DISCIPLINE_RANKS.length - currentRankIndex;
+
+  return {
+    ...currentRank,
+    level: levelNum,
+    unlockedCount,
+    nextRank,
+    neededForNext,
+    progressToNext
+  };
 }
 
 function getAvatarHtml(userOrAvatar, size = 38) {
@@ -1039,7 +1449,7 @@ function renderUserProfile() {
   const userLevelChip = document.getElementById('userLevelChip');
   if (userLevelChip) {
     userLevelChip.textContent = lvl.prefix;
-    userLevelChip.title = `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/60 достижений)`;
+    userLevelChip.title = `${lvl.fullTitle} (${lvl.unlockedCount}/60 достижений • ${lvl.pts} PTS)`;
   }
 
   const displayName = document.getElementById('displayName');
@@ -1059,14 +1469,15 @@ function renderUserProfile() {
 
   const profileLevelBadge = document.getElementById('profileLevelBadge');
   if (profileLevelBadge) {
-    profileLevelBadge.textContent = `${lvl.prefix} ${lvl.title} (Ур. ${lvl.level})`;
+    profileLevelBadge.textContent = `${lvl.fullTitle} • ${lvl.pts} PTS`;
     profileLevelBadge.className = `profile-level-badge ${lvl.frameClass}`;
-    profileLevelBadge.title = `Прогресс: ${lvl.unlockedCount} из 60 достижений`;
+    profileLevelBadge.title = `Рейтинг: ${lvl.pts} PTS • ${lvl.unlockedCount}/60 достижений (Нажмите для шкалы рангов)`;
   }
 
   const profileUsername = document.getElementById('profileUsername');
   if (profileUsername) profileUsername.textContent = `@${currentUser.username}`;
 
+  updateRankHeroBanner();
   updateUserCoinsUI();
 
   const createdDate = new Date(currentUser.createdAt || Date.now());
@@ -6246,6 +6657,7 @@ function renderAchievements() {
 
   updateTrophyTopBadge();
   updateUserCoinsUI();
+  updateRankHeroBanner();
 
   // Filter
   const filtered = achievements.filter(ach => {
@@ -6472,6 +6884,7 @@ function resetMyAchievements() {
   renderAchievements();
   updateTrophyTopBadge();
   updateUserCoinsUI();
+  updateRankHeroBanner();
   renderLeaderboard();
   alert('🧹 Все ваши достижения и coins успешно сброшены! Прогресс (0/18), баланс 0 coins.');
 }
@@ -6708,8 +7121,270 @@ function getBadgeHtml(badgeId) {
   return item ? item.badgeHtml : '';
 }
 
+function updateRankHeroBanner() {
+  if (!currentUser) return;
+  const lvl = getUserLevelData(currentUser);
+
+  const pill = document.getElementById('rankHeroPill');
+  if (pill) {
+    pill.textContent = `${lvl.symbol} ${lvl.league} ${lvl.division}`;
+    pill.style.color = lvl.color;
+  }
+
+  const pts = document.getElementById('rankHeroPts');
+  if (pts) pts.textContent = `${lvl.pts} PTS`;
+
+  const title = document.getElementById('rankHeroTitle');
+  if (title) title.textContent = lvl.fullTitle;
+
+  const nextText = document.getElementById('rankHeroNextText');
+  if (nextText) {
+    if (lvl.nextRank) {
+      nextText.textContent = `Открыто ${lvl.unlockedCount}/60 ачивок. До ранга ${lvl.nextRank.symbol} ${lvl.nextRank.title}: осталось ${lvl.neededForNext} ачив. (${lvl.progressToNext}%)`;
+    } else {
+      nextText.textContent = `👑 Достигнут абсолютный MAX (${lvl.unlockedCount}/60) — Легенда Олимпа!`;
+    }
+  }
+
+  const avatarSlot = document.getElementById('rankHeroAvatarWrap');
+  if (avatarSlot) {
+    avatarSlot.innerHTML = getAvatarHtml(currentUser, 44);
+  }
+}
+
+function renderRanksContent(container) {
+  if (!container) return;
+  const lvl = currentUser ? getUserLevelData(currentUser) : null;
+  const userUnlocked = lvl ? lvl.unlockedCount : 0;
+
+  // Group ranks by League
+  const leagues = [
+    {
+      name: 'Вершина Олимпа (MAX)',
+      icon: '👑',
+      desc: 'Абсолютная легенда дисциплины. 60+ достижений. Все разделы закрыты на 100%.',
+      frameClass: 'lvl-frame-6',
+      color: '#f43f5e',
+      ranks: DISCIPLINE_RANKS.filter(r => r.league === 'Легенда Олимпа')
+    },
+    {
+      name: 'Лига Грандмастеров',
+      icon: '💎',
+      desc: 'Элитный рейтинг гроссмейстеров: 45–59 достижений. Алмазный кристалл.',
+      frameClass: 'lvl-frame-5',
+      color: '#38bdf8',
+      ranks: DISCIPLINE_RANKS.filter(r => r.league === 'Грандмастер')
+    },
+    {
+      name: 'Лига Титанов Режима',
+      icon: '🔥',
+      desc: 'Золотой огонь продуктивности: 30–44 достижения. Дивизионы от V до I.',
+      frameClass: 'lvl-frame-4',
+      color: '#fbbf24',
+      ranks: DISCIPLINE_RANKS.filter(r => r.league === 'Титан')
+    },
+    {
+      name: 'Лига Центурионов OS',
+      icon: '⚡',
+      desc: 'Серебряный неон концентрации: 16–29 достижений. Дивизионы от V до I.',
+      frameClass: 'lvl-frame-3',
+      color: '#cbd5e1',
+      ranks: DISCIPLINE_RANKS.filter(r => r.league === 'Центурион OS')
+    },
+    {
+      name: 'Лига Стражей Воли',
+      icon: '⚔️',
+      desc: 'Бронзовая стойкость и привычки: 6–15 достижений. Дивизионы от V до I.',
+      frameClass: 'lvl-frame-2',
+      color: '#d97706',
+      ranks: DISCIPLINE_RANKS.filter(r => r.league === 'Страж Воли')
+    },
+    {
+      name: 'Лига Рекрутов',
+      icon: '🛡️',
+      desc: 'Стартовые шаги дисциплины: 0–5 достижений. Дивизионы от V до I.',
+      frameClass: 'lvl-frame-1',
+      color: '#94a3b8',
+      ranks: DISCIPLINE_RANKS.filter(r => r.league === 'Рекрут')
+    }
+  ];
+
+  let nextRankInfoHtml = '';
+  if (lvl) {
+    if (lvl.nextRank) {
+      nextRankInfoHtml = `
+        <div style="margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px;">
+            <span>До ранга <b style="color: ${lvl.nextRank.color};">${lvl.nextRank.symbol} ${lvl.nextRank.title}</b>:</span>
+            <span style="color: #38bdf8; font-weight: 800;">осталось ${lvl.neededForNext} ачивок</span>
+          </div>
+          <div class="today-rep-bar-bg" style="height: 8px;">
+            <div class="today-rep-bar-fill" style="width: ${lvl.progressToNext}%; background: linear-gradient(90deg, #38bdf8, #818cf8);"></div>
+          </div>
+        </div>
+      `;
+    } else {
+      nextRankInfoHtml = `
+        <div style="margin-top: 8px; font-size: 12px; color: #f43f5e; font-weight: 800;">
+          👑 Вы достигли высшего пика системы — Легенда Олимпа MAX (3000+ PTS)!
+        </div>
+      `;
+    }
+  }
+
+  let html = `
+    <!-- USER CURRENT STATUS BANNER -->
+    <div class="ranks-guide-box" style="border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.08);">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="rank-status-avatar-wrap">
+            ${currentUser ? getAvatarHtml(currentUser, 52) : ''}
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">Твой текущий ранг</div>
+            <div style="font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+              <span>${lvl ? lvl.symbol : '🌱'}</span>
+              <span>${lvl ? lvl.title : 'Рекрут V'}</span>
+              <span class="rank-pts-pill" style="font-size: 13px;">${lvl ? lvl.pts : 1000} PTS</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Открыто <b>${userUnlocked}</b> из 60 достижений (${Math.round((userUnlocked / 60) * 100)}%)
+            </div>
+          </div>
+        </div>
+        <div>
+          <span class="rank-badge-pill" style="font-size: 12px; padding: 4px 12px;">Уровень ${lvl ? lvl.level : 1} из 26</span>
+        </div>
+      </div>
+      ${nextRankInfoHtml}
+    </div>
+
+    <!-- HOW TO RANK UP INSTRUCTIONS -->
+    <div class="ranks-guide-box">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 20px;">💡</span>
+        <div>
+          <h4 style="font-size: 14px; font-weight: 800;">Как повышать ранг и что нужно делать?</h4>
+          <p style="font-size: 11.5px; color: var(--text-dim); margin-top: 1px;">
+            Выполняйте цели из списка 60 достижений, повышайте рейтинг PTS и открывайте светящиеся рамки профиля:
+          </p>
+        </div>
+      </div>
+      <div class="ranks-guide-grid">
+        <div class="ranks-guide-item">
+          <span style="font-size: 18px;">📚</span>
+          <div>
+            <b>Книги и чтение (13 ачивок)</b>
+            <div style="color: var(--text-muted); margin-top: 2px;">Читайте от 15 до 5 000 страниц и завершайте книги целиком.</div>
+          </div>
+        </div>
+        <div class="ranks-guide-item">
+          <span style="font-size: 18px;">📑</span>
+          <div>
+            <b>ACCA и учёба (12 ачивок)</b>
+            <div style="color: var(--text-muted); margin-top: 2px;">Решайте экзаменационные задачи (10 – 1 000 шт.) и проводите учебные сессии.</div>
+          </div>
+        </div>
+        <div class="ranks-guide-item">
+          <span style="font-size: 18px;">💪</span>
+          <div>
+            <b>Спорт и тренировки (13 ачивок)</b>
+            <div style="color: var(--text-muted); margin-top: 2px;">Отжимайтесь (25 – 10 000 повт.), держите планку до 60 мин и тренируйтесь по плану.</div>
+          </div>
+        </div>
+        <div class="ranks-guide-item">
+          <span style="font-size: 18px;">⚡</span>
+          <div>
+            <b>Дисциплина и режим (14 ачивок)</b>
+            <div style="color: var(--text-muted); margin-top: 2px;">Закрывайте блоки расписания (10 – 500 слотов) и держите дни без штрафов.</div>
+          </div>
+        </div>
+        <div class="ranks-guide-item">
+          <span style="font-size: 18px;">👥</span>
+          <div>
+            <b>Друзья и сообщество (4 ачивки)</b>
+            <div style="color: var(--text-muted); margin-top: 2px;">Приглашайте друзей, принимайте запросы и поднимайтесь в онлайн-рейтинге.</div>
+          </div>
+        </div>
+        <div class="ranks-guide-item">
+          <span style="font-size: 18px;">🪙</span>
+          <div>
+            <b>Стиль и кастомизация (4 ачивки)</b>
+            <div style="color: var(--text-muted); margin-top: 2px;">Копите Coins, покупайте товары в магазине, меняйте аватарку и используйте инкогнито.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL LEAGUES & DIVISIONS LIST -->
+    <div style="margin-top: 8px;">
+  `;
+
+  leagues.forEach(lg => {
+    html += `
+      <div class="ranks-league-card">
+        <div class="ranks-league-header">
+          <div class="ranks-league-title" style="color: ${lg.color};">
+            <span>${lg.icon}</span>
+            <span>${escapeHtml(lg.name)}</span>
+          </div>
+          <div class="ranks-league-range">${escapeHtml(lg.desc)}</div>
+        </div>
+        <div class="ranks-rows-list">
+    `;
+
+    lg.ranks.forEach(r => {
+      const isCurrent = (lvl && lvl.id === r.id);
+      const isUnlocked = (userUnlocked >= r.min);
+      const reqText = r.min === r.max ? `${r.min} ачивок` : (r.max >= 999 ? `${r.min}+ ачивок (MAX)` : `${r.min} – ${r.max} ачивок`);
+
+      html += `
+        <div class="rank-row-item ${isCurrent ? 'current-user-rank' : ''}">
+          <div class="rank-row-left">
+            <span style="font-size: 18px;">${r.symbol}</span>
+            <div class="rank-row-info">
+              <div class="rank-row-title">
+                <span style="color: ${r.color};">${escapeHtml(r.title)}</span>
+                ${isCurrent ? '<span class="rank-current-pill">⭐ ТВОЙ РАНГ</span>' : ''}
+              </div>
+              <div class="rank-row-desc">${escapeHtml(r.desc)}</div>
+            </div>
+          </div>
+          <div class="rank-row-right">
+            <span class="rank-pts-pill" style="font-size: 12px;">${r.pts} PTS</span>
+            <span class="rank-req-badge" style="${isUnlocked ? 'color: #34d399; border-color: rgba(52, 211, 153, 0.4); font-weight: 800;' : ''}">
+              ${isUnlocked ? '✓ ' : ''}${reqText}
+            </span>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function openRanksModal() {
+  const modal = document.getElementById('ranksModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    renderRanksContent(document.getElementById('ranksContainerModal'));
+  }
+}
+
+function closeRanksModal() {
+  const modal = document.getElementById('ranksModal');
+  if (modal) modal.classList.add('hidden');
+}
+
 function switchAchievementsSubTab(subTab) {
-  ['trophies', 'shop', 'leaderboard'].forEach(t => {
+  ['trophies', 'ranks', 'shop', 'leaderboard'].forEach(t => {
     const btn = document.getElementById(`subtabBtn_${t}`);
     const view = document.getElementById(`achSubView_${t}`);
     if (btn) {
@@ -6722,7 +7397,9 @@ function switchAchievementsSubTab(subTab) {
     }
   });
 
+  updateRankHeroBanner();
   if (subTab === 'trophies') renderAchievements();
+  if (subTab === 'ranks') renderRanksContent(document.getElementById('ranksContainerInline'));
   if (subTab === 'shop') renderShop();
   if (subTab === 'leaderboard') renderLeaderboard();
 }
@@ -7034,8 +7711,8 @@ function renderLeaderboard() {
 
       nameHtml = `
         <div style="font-weight: 800; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;" class="${item.equippedFont}">
-          <span class="user-level-chip" title="Уровень ${itemLvl.level}: ${itemLvl.title} (${itemLvl.unlockedCount}/${achievements.length} достижений)">${itemLvl.prefix}</span>
-          <span>${escapeHtml(item.displayName)}</span> ${badgeHtml} ${selfPrivacyTag} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 2px;">(Вы)</span>' : ''}
+          <span class="user-level-chip" title="${itemLvl.fullTitle} (${itemLvl.unlockedCount}/${achievements.length} достижений • ${itemLvl.pts} PTS)">${itemLvl.prefix}</span>
+          <span>${escapeHtml(item.displayName)}</span> ${badgeHtml} <span class="lb-level-tag" style="color: ${itemLvl.color}; font-size: 11px; font-weight: 800; margin-left: 2px;">${itemLvl.badgeTag}</span> ${selfPrivacyTag} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 2px;">(Вы)</span>' : ''}
         </div>
       `;
 
