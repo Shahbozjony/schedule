@@ -127,6 +127,13 @@ function createDefaultUserProfile(name, username, password) {
     password: password || 'Schedule2004',
     createdAt: new Date().toISOString(),
     streak: 0,
+    coins: 0,
+    inventory: [],
+    equippedFont: '',
+    equippedBadge: '',
+    unlockedAchievementsHistory: [],
+    achievementsBaseDate: '2026-11-09',
+    resetV33ScheduleAndCoins: true,
     categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
     scheduleSlots: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SLOTS)),
     scheduleCompletions: {},
@@ -243,6 +250,47 @@ function initUserData() {
   if (!localStorage.getItem(CLEAN_V33_FLAG)) {
     // 1. Reset all achievements to clean 0/18
     localStorage.setItem(APP_ACHIEVEMENTS_KEY, JSON.stringify(DEFAULT_ACHIEVEMENTS));
+
+    // Also sanitize existingUser if present in APP_DATA_KEY
+    if (existingUser) {
+      existingUser.coins = 0;
+      existingUser.unlockedAchievementsHistory = [];
+      existingUser.achievementsBaseDate = '2026-11-09';
+      existingUser.resetV33ScheduleAndCoins = true;
+      if (existingUser.scheduleSlots && Array.isArray(existingUser.scheduleSlots)) {
+        existingUser.scheduleSlots = existingUser.scheduleSlots
+          .filter(slot => !(slot.specificDate && slot.specificDate >= '2026-11-09'))
+          .map(slot => {
+            if (!slot.recurrenceType || slot.recurrenceType === 'daily' || slot.recurrenceType === 'weekdays') {
+              slot.recurrenceType = 'specific_date';
+              slot.specificDate = '2026-11-08';
+            }
+            return slot;
+          });
+      } else {
+        existingUser.scheduleSlots = [];
+      }
+      if (existingUser.scheduleCompletions) {
+        Object.keys(existingUser.scheduleCompletions).forEach(d => {
+          if (d >= '2026-11-09') delete existingUser.scheduleCompletions[d];
+        });
+      }
+      if (existingUser.scheduleLogs) {
+        Object.keys(existingUser.scheduleLogs).forEach(d => {
+          if (d >= '2026-11-09') delete existingUser.scheduleLogs[d];
+        });
+      }
+      if (existingUser.books) {
+        existingUser.books.forEach(b => {
+          b.currentPage = 0;
+          b.basePage = 0;
+          b.status = 'reading';
+        });
+      }
+      try {
+        localStorage.setItem(APP_DATA_KEY, JSON.stringify(existingUser));
+      } catch (e) {}
+    }
 
     // 2. Reset coins, history, schedule slots >= 2026-11-09 across all stored users
     Object.values(users).forEach(u => {
