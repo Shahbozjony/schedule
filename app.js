@@ -4296,6 +4296,22 @@ function exportDataBackup() {
   downloadAnchor.remove();
 }
 
+async function forceAppUpdate() {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const reg of registrations) {
+        await reg.unregister();
+      }
+    }
+  } catch (e) {}
+  window.location.reload(true);
+}
+
 function importDataBackup(event) {
   const file = event.target.files[0];
   if (!file) return;
