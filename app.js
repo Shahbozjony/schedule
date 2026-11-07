@@ -2546,6 +2546,10 @@ function renderReport() {
   let totalPlankSecs = 0;
   let totalBlocksDone = 0;
   let totalPenalty = 0;
+  let periodPagesRead = 0;
+  let periodStudyTasks = 0;
+  let periodStudySessions = 0;
+  const bookPagesMap = {};
 
   // Category completion counter: { [catId]: { count: 0, totalHours: 0 } }
   const catStats = {};
@@ -2609,6 +2613,68 @@ function renderReport() {
       });
     }
 
+    // Study and Reading logs for that date
+    const sLog = (currentUser.studyLogs && currentUser.studyLogs[dateStr]);
+    if (sLog) {
+      if (sLog.bookPages) {
+        Object.entries(sLog.bookPages).forEach(([bId, pages]) => {
+          const p = parseInt(pages, 10) || 0;
+          periodPagesRead += p;
+          bookPagesMap[bId] = (bookPagesMap[bId] || 0) + p;
+        });
+      }
+      if (sLog.scheduleDone) {
+        Object.entries(sLog.scheduleDone).forEach(([actName, val]) => {
+          const v = parseInt(val, 10) || 0;
+          periodStudyTasks += v;
+        });
+      }
+      if (sLog.scheduleSets) {
+        Object.values(sLog.scheduleSets).forEach(arr => {
+          if (Array.isArray(arr)) {
+            const completedSets = arr.filter(v => parseInt(v, 10) > 0).length;
+            periodStudySessions += completedSets;
+          }
+        });
+      }
+      if (sLog.activities) {
+        Object.entries(sLog.activities).forEach(([actId, actData]) => {
+          if (actData.type === 'sets' || (actData.sets && Array.isArray(actData.sets))) {
+            const completedSets = (actData.sets || []).length;
+            periodStudySessions += completedSets;
+          } else {
+            const d = parseInt(actData.done, 10) || 0;
+            if (actId.includes('acca')) periodStudyTasks += d;
+            if (actId.includes('reading') && periodPagesRead === 0) periodPagesRead += d;
+          }
+        });
+      }
+    }
+
+    // Check study blocks in schedule completions
+    dayCompletedSlotIds.forEach(id => {
+      const s = slots.find(slot => slot.id === id);
+      if (s) {
+        const isStudySlot = s.category === 'work' || (s.name && (s.name.toLowerCase().includes('acca') || s.name.toLowerCase().includes('учеб') || s.name.toLowerCase().includes('книг') || s.name.toLowerCase().includes('чтени')));
+        if (isStudySlot) {
+          if (s.exercises && s.exercises.length > 0) {
+            s.exercises.forEach(ex => {
+              const exNameLower = (ex.name || '').toLowerCase();
+              if (ex.unit === 'задач' || exNameLower.includes('acca') || exNameLower.includes('задач')) {
+                if (!sLog || !sLog.scheduleDone || !sLog.scheduleDone[ex.name]) {
+                  periodStudyTasks += (parseInt(ex.target, 10) || 1);
+                }
+              } else if (ex.unit === 'стр' || exNameLower.includes('книг') || exNameLower.includes('чтени')) {
+                if (!sLog || !sLog.bookPages || Object.keys(sLog.bookPages).length === 0) {
+                  periodPagesRead += (parseInt(ex.target, 10) || 1);
+                }
+              }
+            });
+          }
+        }
+      }
+    });
+
     // Missed blocks penalty for that date
     if (!currentUser.penaltiesClearedUntil || dateStr > currentUser.penaltiesClearedUntil) {
       slots.forEach(s => {
@@ -2662,18 +2728,28 @@ function renderReport() {
     });
   }
 
-  // Render Section 3: Exercise Volume for Period
+  // Render Section 3: Exercises & Study Volume for Period
   const exListEl = document.getElementById('exerciseReportList');
-  if (exListEl && currentUser.exercises) {
+  if (exListEl) {
     exListEl.innerHTML = '';
-    currentUser.exercises.forEach(ex => {
+
+    // 1. Sport & Workout Group Subheader
+    const sportHdr = document.createElement('div');
+    sportHdr.className = 'report-group-subhdr';
+    sportHdr.innerHTML = `<span>💪</span> <span>Спорт и тренировки</span>`;
+    exListEl.appendChild(sportHdr);
+
+    const userExercises = currentUser.exercises || DEFAULT_EXERCISES;
+    userExercises.forEach(ex => {
       const row = document.createElement('div');
       row.className = 'exercise-report-item';
       
       const isPlank = ex.id.includes('plank') || ex.name.toLowerCase().includes('планк');
       let valText = '';
       if (isPlank) {
-        valText = `${totalPlankSecs} сек в планке`;
+        valText = totalPlankSecs > 60 
+          ? `${Math.floor(totalPlankSecs / 60)} мин ${totalPlankSecs % 60} сек`
+          : `${totalPlankSecs} сек в планке`;
       } else if (ex.type === 'sets') {
         valText = `Цель: ${ex.target} подх.`;
       } else {
@@ -2685,12 +2761,114 @@ function renderReport() {
           <span>${ex.icon || '🏋️'}</span>
           <span>${escapeHtml(ex.name)}</span>
         </div>
-        <div class="ex-rep-val">
+        <div class="ex-rep-val" style="color: #34d399;">
           ${valText}
         </div>
       `;
       exListEl.appendChild(row);
     });
+
+    // 2. Study, Books & ACCA Group Subheader
+    const studyHdr = document.createElement('div');
+    studyHdr.className = 'report-group-subhdr';
+    studyHdr.style.marginTop = '14px';
+    studyHdr.innerHTML = `<span>📚</span> <span>Учёба, книги и ACCA</span>`;
+    exListEl.appendChild(studyHdr);
+
+    // Summary Metric 1: Books Finished
+    const booksFinished = (currentUser.books || []).filter(b => b.status === 'completed' || (parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10))).length;
+    const totalBooksCount = (currentUser.books || []).length;
+    
+    const rowBooks = document.createElement('div');
+    rowBooks.className = 'exercise-report-item';
+    rowBooks.innerHTML = `
+      <div class="ex-rep-title">
+        <span>🏆</span>
+        <span>Прочитано книг целиком</span>
+      </div>
+      <div class="ex-rep-val" style="color: #f59e0b;">
+        ${booksFinished} из ${totalBooksCount} книг
+      </div>
+    `;
+    exListEl.appendChild(rowBooks);
+
+    // Summary Metric 2: Total Pages Read in Period
+    let effectivePages = periodPagesRead;
+    let allTimePages = 0;
+    (currentUser.books || []).forEach(b => { allTimePages += (parseInt(b.currentPage, 10) || 0); });
+    if (effectivePages === 0 && (currentReportPeriod === 'all' || currentReportPeriod === 'month')) {
+      effectivePages = allTimePages;
+    }
+    const rowPages = document.createElement('div');
+    rowPages.className = 'exercise-report-item';
+    rowPages.innerHTML = `
+      <div class="ex-rep-title">
+        <span>📖</span>
+        <span>Количество прочитанных страниц</span>
+      </div>
+      <div class="ex-rep-val" style="color: #38bdf8;">
+        ${effectivePages} стр.
+      </div>
+    `;
+    exListEl.appendChild(rowPages);
+
+    // Summary Metric 3: ACCA Tasks / Topics Solved
+    const rowTasks = document.createElement('div');
+    rowTasks.className = 'exercise-report-item';
+    rowTasks.innerHTML = `
+      <div class="ex-rep-title">
+        <span>📑</span>
+        <span>ACCA: решено задач / тем</span>
+      </div>
+      <div class="ex-rep-val" style="color: #a78bfa;">
+        ${periodStudyTasks} задач
+      </div>
+    `;
+    exListEl.appendChild(rowTasks);
+
+    // Summary Metric 4: ACCA Study Sessions / Pomodoro
+    const rowSessions = document.createElement('div');
+    rowSessions.className = 'exercise-report-item';
+    rowSessions.innerHTML = `
+      <div class="ex-rep-title">
+        <span>⏱️</span>
+        <span>ACCA: учебных сессий</span>
+      </div>
+      <div class="ex-rep-val" style="color: #ec4899;">
+        ${periodStudySessions} сессий
+      </div>
+    `;
+    exListEl.appendChild(rowSessions);
+
+    // Individual Books Progress List
+    if (currentUser.books && currentUser.books.length > 0) {
+      currentUser.books.forEach(b => {
+        const cur = parseInt(b.currentPage, 10) || 0;
+        const total = parseInt(b.totalPages, 10) || 1;
+        const pct = Math.min(100, Math.round((cur / total) * 100));
+        const periodBookPages = bookPagesMap[b.id] || 0;
+
+        let bookValHtml = '';
+        if (periodBookPages > 0 && (currentReportPeriod === 'today' || currentReportPeriod === 'yesterday' || currentReportPeriod === 'week')) {
+          bookValHtml = `+${periodBookPages} стр. (${cur}/${total} стр. • ${pct}%)`;
+        } else {
+          bookValHtml = `${cur}/${total} стр. (${pct}%)`;
+        }
+
+        const bRow = document.createElement('div');
+        bRow.className = 'exercise-report-item';
+        bRow.innerHTML = `
+          <div class="ex-rep-title" style="min-width: 0; max-width: 62%;">
+            <span>📖</span>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</span>
+          </div>
+          <div class="ex-rep-val" style="color: ${b.status === 'completed' || cur >= total ? '#10b981' : '#38bdf8'}; font-size: 12px; text-align: right; white-space: nowrap;">
+            ${bookValHtml}
+          </div>
+        `;
+        exListEl.appendChild(bRow);
+      });
+    }
   }
 
   // Render Penalty Bank & Logs inside the report
