@@ -1023,6 +1023,7 @@ function openAddSlotModal() {
   populateCategorySelect('work');
 
   document.getElementById('slotExercisesContainer').innerHTML = '';
+  updateSlotExercisesHeaderVisibility();
   document.getElementById('deleteSlotBtn').classList.add('hidden');
   document.getElementById('slotModal').classList.remove('hidden');
 }
@@ -1054,9 +1055,29 @@ function closeSlotModal() {
 function renderSlotExercisesInModal(exercises) {
   const container = document.getElementById('slotExercisesContainer');
   container.innerHTML = '';
-  exercises.forEach(ex => {
+  (exercises || []).forEach(ex => {
     addExerciseFieldToSlot(ex.name, ex.sets, ex.target, ex.unit);
   });
+  updateSlotExercisesHeaderVisibility();
+}
+
+function removeSlotExerciseRow(btn) {
+  const row = btn.closest('.slot-ex-row');
+  if (row) row.remove();
+  updateSlotExercisesHeaderVisibility();
+}
+
+function updateSlotExercisesHeaderVisibility() {
+  const container = document.getElementById('slotExercisesContainer');
+  const header = document.getElementById('slotExHeaderRow');
+  const emptyHint = document.getElementById('slotExEmptyHint');
+  const count = container ? container.querySelectorAll('.slot-ex-row').length : 0;
+  if (header) {
+    header.style.display = count > 0 ? 'grid' : 'none';
+  }
+  if (emptyHint) {
+    emptyHint.style.display = count === 0 ? 'block' : 'none';
+  }
 }
 
 function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз') {
@@ -1067,7 +1088,7 @@ function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз
   const userExercises = (currentUser && currentUser.exercises) || DEFAULT_EXERCISES;
   const userStudy = (currentUser && currentUser.studyActivities) || DEFAULT_STUDY_ACTIVITIES;
 
-  let optionsHtml = `<option value="">-- Выберите из базы --</option>`;
+  let optionsHtml = `<option value="">-- Выберите дело/упражнение --</option>`;
   let matched = false;
 
   const userBooks = (currentUser && currentUser.books) || DEFAULT_BOOKS;
@@ -1105,23 +1126,24 @@ function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз
   optionsHtml += `<option value="__custom__">✏️ Ввести другое вручную...</option>`;
 
   row.innerHTML = `
-    <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение или предмет из базы">
+    <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение или предмет из базы" aria-label="Упражнение">
       ${optionsHtml}
     </select>
-    <input type="number" placeholder="Подх." min="1" max="100" value="${sets}" title="Количество подходов / сессий" class="ex-sets-input">
-    <input type="number" placeholder="Цель" min="1" max="5000" value="${target}" title="Повторений, задач или страниц" class="ex-target-input">
-    <select class="ex-unit-input" title="Единица измерения">
+    <input type="number" placeholder="Подх." min="1" max="100" value="${sets}" title="Количество подходов" aria-label="Подходы" class="ex-sets-input">
+    <input type="number" placeholder="Норма" min="1" max="5000" value="${target}" title="Норма повторений, страниц или минут" aria-label="Норма или раз" class="ex-target-input">
+    <select class="ex-unit-input" title="Единица измерения" aria-label="Единица измерения">
+      <option value="раз" ${unit === 'раз' ? 'selected' : ''}>раз</option>
       <option value="задач" ${unit === 'задач' ? 'selected' : ''}>задач</option>
       <option value="стр" ${unit === 'стр' ? 'selected' : ''}>стр</option>
       <option value="мин" ${unit === 'мин' ? 'selected' : ''}>мин</option>
-      <option value="раз" ${unit === 'раз' ? 'selected' : ''}>раз</option>
       <option value="сек" ${unit === 'сек' ? 'selected' : ''}>сек</option>
       <option value="сессий" ${unit === 'сессий' ? 'selected' : ''}>сессий</option>
       <option value="подх." ${unit === 'подх.' ? 'selected' : ''}>подх.</option>
     </select>
-    <button type="button" class="slot-ex-delete-btn" onclick="this.parentElement.remove()" title="Удалить строку">✕</button>
+    <button type="button" class="slot-ex-delete-btn" onclick="removeSlotExerciseRow(this)" title="Удалить норму" aria-label="Удалить">✕</button>
   `;
   container.appendChild(row);
+  updateSlotExercisesHeaderVisibility();
 }
 
 function onSlotExerciseSelectChanged(selectEl) {
