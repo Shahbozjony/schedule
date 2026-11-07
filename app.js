@@ -40,32 +40,8 @@ const DEFAULT_CATEGORIES = [
   { id: 'sleep', name: 'Сон / Отбой', emoji: '🌙', color: '#a78bfa' }
 ];
 
-// Default strict schedule
-const DEFAULT_SCHEDULE_SLOTS = [
-  { id: 's1', name: '🌅 Подъем, вода, зарядка', start: '06:30', end: '07:15', category: 'routine', penalty: 2000, exercises: [] },
-  { 
-    id: 's2', 
-    name: '💪 Тренировка и норма отжиманий', 
-    start: '07:15', 
-    end: '08:00', 
-    category: 'sport', 
-    penalty: 5000, 
-    exercises: [
-      { name: 'Отжимания от пола', sets: 4, target: 25, unit: 'раз' },
-      { name: 'Планка', sets: 3, target: 60, unit: 'сек' }
-    ] 
-  },
-  { id: 's3', name: '🍳 Питательный завтрак и душ', start: '08:00', end: '08:45', category: 'routine', penalty: 2000, exercises: [] },
-  { id: 's_travel1', name: '🚗 Дорога / Время в пути', start: '08:45', end: '09:00', category: 'travel', penalty: 2000, exercises: [] },
-  { id: 's4', name: '🎯 Глубокая работа / Учеба (Блок 1)', start: '09:00', end: '13:00', category: 'work', penalty: 10000, exercises: [] },
-  { id: 's5', name: '🥗 Обед и перезагрузка', start: '13:00', end: '14:00', category: 'rest', penalty: 2000, exercises: [] },
-  { id: 's6', name: '💼 Работа, задачи и проекты (Блок 2)', start: '14:00', end: '18:00', category: 'work', penalty: 10000, exercises: [] },
-  { id: 's_travel2', name: '🚗 Дорога домой / В пути', start: '18:00', end: '18:30', category: 'travel', penalty: 2000, exercises: [] },
-  { id: 's7', name: '🚶 Прогулка, разгрузка, свежий воздух', start: '18:30', end: '19:00', category: 'rest', penalty: 3000, exercises: [] },
-  { id: 's8', name: '🍽️ Ужин и время с семьей', start: '19:00', end: '20:30', category: 'routine', penalty: 3000, exercises: [] },
-  { id: 's9', name: '📚 Чтение книги и итоги дня', start: '20:30', end: '22:00', category: 'work', penalty: 5000, exercises: [] },
-  { id: 's10', name: '🌙 Подготовка ко сну, без гаджетов', start: '22:30', end: '23:00', category: 'sleep', penalty: 5000, exercises: [] }
-];
+// Default strict schedule (clean by default so user composes from scratch)
+const DEFAULT_SCHEDULE_SLOTS = [];
 
 // Default exercises
 const DEFAULT_EXERCISES = [
@@ -87,8 +63,8 @@ const DEFAULT_BOOKS = [
     title: 'ACCA Study Text (Financial Reporting)',
     author: 'BPP / Kaplan',
     totalPages: 480,
-    basePage: 60,
-    currentPage: 60,
+    basePage: 0,
+    currentPage: 0,
     dailyTarget: 20,
     status: 'reading'
   },
@@ -97,8 +73,8 @@ const DEFAULT_BOOKS = [
     title: 'Атомные привычки',
     author: 'Джеймс Клир',
     totalPages: 320,
-    basePage: 85,
-    currentPage: 85,
+    basePage: 0,
+    currentPage: 0,
     dailyTarget: 25,
     status: 'reading'
   }
@@ -262,6 +238,58 @@ function initUserData() {
     } catch(e) {}
   }
 
+  // MIGRATION v33: Clean schedule from 2026-11-09 onwards, reset coins to 0 and achievements to 0/18
+  const CLEAN_V33_FLAG = 'discipline_v33_reset_20261109';
+  if (!localStorage.getItem(CLEAN_V33_FLAG)) {
+    // 1. Reset all achievements to clean 0/18
+    localStorage.setItem(APP_ACHIEVEMENTS_KEY, JSON.stringify(DEFAULT_ACHIEVEMENTS));
+
+    // 2. Reset coins, history, schedule slots >= 2026-11-09 across all stored users
+    Object.values(users).forEach(u => {
+      u.coins = 0;
+      u.unlockedAchievementsHistory = [];
+      u.achievementsBaseDate = '2026-11-09';
+      u.resetV33ScheduleAndCoins = true;
+
+      if (u.scheduleSlots && Array.isArray(u.scheduleSlots)) {
+        u.scheduleSlots = u.scheduleSlots
+          .filter(slot => !(slot.specificDate && slot.specificDate >= '2026-11-09'))
+          .map(slot => {
+            if (!slot.recurrenceType || slot.recurrenceType === 'daily' || slot.recurrenceType === 'weekdays') {
+              slot.recurrenceType = 'specific_date';
+              slot.specificDate = '2026-11-08';
+            }
+            return slot;
+          });
+      } else {
+        u.scheduleSlots = [];
+      }
+
+      if (u.scheduleCompletions) {
+        Object.keys(u.scheduleCompletions).forEach(d => {
+          if (d >= '2026-11-09') delete u.scheduleCompletions[d];
+        });
+      }
+
+      if (u.scheduleLogs) {
+        Object.keys(u.scheduleLogs).forEach(d => {
+          if (d >= '2026-11-09') delete u.scheduleLogs[d];
+        });
+      }
+
+      if (u.books) {
+        u.books.forEach(b => {
+          b.currentPage = 0;
+          b.basePage = 0;
+          b.status = 'reading';
+        });
+      }
+    });
+
+    saveAllUsers(users);
+    localStorage.setItem(CLEAN_V33_FLAG, 'true');
+  }
+
   // Check active session
   let activeSession = localStorage.getItem(APP_SESSION_KEY);
   if (activeSession && activeSession.toLowerCase() === 'shahboz') {
@@ -286,6 +314,61 @@ function ensureUserDefaults() {
   if (!currentUser.equippedFont) currentUser.equippedFont = '';
   if (!currentUser.equippedBadge) currentUser.equippedBadge = '';
   if (!currentUser.unlockedAchievementsHistory) currentUser.unlockedAchievementsHistory = [];
+
+  // MIGRATION v33: Reset schedule slots >= 2026-11-09, reset coins to 0 and achievements to 0/18
+  if (!currentUser.resetV33ScheduleAndCoins) {
+    currentUser.resetV33ScheduleAndCoins = true;
+    currentUser.coins = 0;
+    currentUser.unlockedAchievementsHistory = [];
+    currentUser.achievementsBaseDate = '2026-11-09';
+
+    if (currentUser.scheduleSlots && Array.isArray(currentUser.scheduleSlots)) {
+      currentUser.scheduleSlots = currentUser.scheduleSlots
+        .filter(slot => !(slot.specificDate && slot.specificDate >= '2026-11-09'))
+        .map(slot => {
+          if (!slot.recurrenceType || slot.recurrenceType === 'daily' || slot.recurrenceType === 'weekdays') {
+            slot.recurrenceType = 'specific_date';
+            slot.specificDate = '2026-11-08';
+          }
+          return slot;
+        });
+    } else {
+      currentUser.scheduleSlots = [];
+    }
+
+    if (currentUser.scheduleCompletions) {
+      Object.keys(currentUser.scheduleCompletions).forEach(d => {
+        if (d >= '2026-11-09') delete currentUser.scheduleCompletions[d];
+      });
+    }
+
+    if (currentUser.scheduleLogs) {
+      Object.keys(currentUser.scheduleLogs).forEach(d => {
+        if (d >= '2026-11-09') delete currentUser.scheduleLogs[d];
+      });
+    }
+
+    if (currentUser.books) {
+      currentUser.books.forEach(b => {
+        b.currentPage = 0;
+        b.basePage = 0;
+        b.status = 'reading';
+      });
+    }
+
+    try {
+      const achievements = getAchievements();
+      achievements.forEach(ach => {
+        if (ach.unlockedBy && Array.isArray(ach.unlockedBy)) {
+          ach.unlockedBy = ach.unlockedBy.filter(u => {
+            const un = u.toLowerCase();
+            return un !== 'shahbozjony' && un !== 'shahboz';
+          });
+        }
+      });
+      saveAchievements(achievements);
+    } catch(e) {}
+  }
   if (!currentUser.categories || currentUser.categories.length === 0) {
     currentUser.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   } else {
@@ -4839,14 +4922,23 @@ function checkAutomaticAchievements() {
   const achievements = getAchievements();
   let updated = false;
 
-  // Compute stats
+  const baseDate = currentUser.achievementsBaseDate || '2026-11-09';
+  const todayKey = getTodayDateKey();
+  if (todayKey < baseDate) {
+    // Before base date, do not auto-unlock achievements
+    return;
+  }
+
+  // Compute stats (progress from baseDate onwards)
   let totalPagesRead = 0;
   (currentUser.books || []).forEach(b => {
-    totalPagesRead += (parseInt(b.currentPage, 10) || 0);
+    const cur = parseInt(b.currentPage, 10) || 0;
+    const base = parseInt(b.basePage, 10) || 0;
+    totalPagesRead += Math.max(0, cur - base);
   });
   if (currentUser.studyLogs) {
-    Object.values(currentUser.studyLogs).forEach(log => {
-      if (log.bookPages) {
+    Object.entries(currentUser.studyLogs).forEach(([date, log]) => {
+      if (date >= baseDate && log.bookPages) {
         Object.values(log.bookPages).forEach(p => { totalPagesRead += (parseInt(p, 10) || 0); });
       }
     });
@@ -4854,15 +4946,15 @@ function checkAutomaticAchievements() {
 
   let booksCompleted = 0;
   (currentUser.books || []).forEach(b => {
-    if (b.status === 'completed' || (parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10))) {
+    if (b.status === 'completed' || (parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10) && parseInt(b.totalPages, 10) > 0)) {
       booksCompleted++;
     }
   });
 
   let totalReps = 0;
   if (currentUser.workoutLogs) {
-    Object.values(currentUser.workoutLogs).forEach(log => {
-      if (log.exercises) {
+    Object.entries(currentUser.workoutLogs).forEach(([date, log]) => {
+      if (date >= baseDate && log.exercises) {
         Object.values(log.exercises).forEach(ex => {
           totalReps += (parseInt(ex.done, 10) || 0);
         });
@@ -4875,14 +4967,16 @@ function checkAutomaticAchievements() {
   let accaStudyTextPages = 0;
 
   if (currentUser.studyLogs) {
-    Object.values(currentUser.studyLogs).forEach(log => {
-      if (log.scheduleDone) {
-        Object.values(log.scheduleDone).forEach(val => { totalStudyTasks += (parseInt(val, 10) || 0); });
-      }
-      if (log.scheduleSets) {
-        Object.values(log.scheduleSets).forEach(arr => {
-          if (Array.isArray(arr)) totalStudySessions += arr.filter(v => v > 0).length;
-        });
+    Object.entries(currentUser.studyLogs).forEach(([date, log]) => {
+      if (date >= baseDate) {
+        if (log.scheduleDone) {
+          Object.values(log.scheduleDone).forEach(val => { totalStudyTasks += (parseInt(val, 10) || 0); });
+        }
+        if (log.scheduleSets) {
+          Object.values(log.scheduleSets).forEach(arr => {
+            if (Array.isArray(arr)) totalStudySessions += arr.filter(v => v > 0).length;
+          });
+        }
       }
     });
   }
@@ -4890,35 +4984,41 @@ function checkAutomaticAchievements() {
   // Also check schedule completions
   if (currentUser.scheduleCompletions && currentUser.scheduleSlots) {
     Object.entries(currentUser.scheduleCompletions).forEach(([dateStr, slotIds]) => {
-      slotIds.forEach(slotId => {
-        const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
-        if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
-          totalStudySessions++;
-          if (slot.exercises) {
-            slot.exercises.forEach(ex => {
-              totalStudyTasks += (parseInt(ex.target, 10) || 1);
-            });
+      if (dateStr >= baseDate) {
+        slotIds.forEach(slotId => {
+          const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
+          if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
+            totalStudySessions++;
+            if (slot.exercises) {
+              slot.exercises.forEach(ex => {
+                totalStudyTasks += (parseInt(ex.target, 10) || 1);
+              });
+            }
           }
-        }
-      });
+        });
+      }
     });
   }
 
   const accaBook = (currentUser.books || []).find(b => (b.id && b.id.includes('acca')) || (b.title && b.title.toLowerCase().includes('acca')));
   if (accaBook) {
-    accaStudyTextPages = parseInt(accaBook.currentPage, 10) || parseInt(accaBook.basePage, 10) || 0;
+    const cur = parseInt(accaBook.currentPage, 10) || 0;
+    const base = parseInt(accaBook.basePage, 10) || 0;
+    accaStudyTextPages = Math.max(0, cur - base);
   }
 
   let cleanDays = 0;
   if (currentUser.workoutLogs) {
-    Object.values(currentUser.workoutLogs).forEach(log => {
-      if (log.status === 'success' || (log.penalty === 0 && log.exercises && Object.keys(log.exercises).length > 0)) {
-        cleanDays++;
+    Object.entries(currentUser.workoutLogs).forEach(([date, log]) => {
+      if (date >= baseDate) {
+        if (log.status === 'success' || (log.penalty === 0 && log.exercises && Object.keys(log.exercises).length > 0)) {
+          cleanDays++;
+        }
       }
     });
   }
 
-  const streak = currentUser.streak || currentUser.studyStreak || 0;
+  const streak = (todayKey >= baseDate ? (currentUser.streak || currentUser.studyStreak || 0) : 0);
 
   achievements.forEach(ach => {
     if (!ach.unlockedBy) ach.unlockedBy = [];
@@ -5030,61 +5130,85 @@ function renderAchievements() {
     return;
   }
 
-  // Get current user progress stats for display
+  // Get current user progress stats for display (only from baseDate onwards)
+  const baseDate = currentUser ? (currentUser.achievementsBaseDate || '2026-11-09') : '2026-11-09';
+  const todayKey = getTodayDateKey();
+  const isPastBase = (todayKey >= baseDate);
+
   let totalPagesRead = 0;
-  (currentUser.books || []).forEach(b => { totalPagesRead += (parseInt(b.currentPage, 10) || 0); });
-  if (currentUser.studyLogs) {
-    Object.values(currentUser.studyLogs).forEach(log => {
-      if (log.bookPages) Object.values(log.bookPages).forEach(p => { totalPagesRead += (parseInt(p, 10) || 0); });
+  if (isPastBase) {
+    (currentUser.books || []).forEach(b => {
+      const cur = parseInt(b.currentPage, 10) || 0;
+      const base = parseInt(b.basePage, 10) || 0;
+      totalPagesRead += Math.max(0, cur - base);
     });
+    if (currentUser.studyLogs) {
+      Object.entries(currentUser.studyLogs).forEach(([date, log]) => {
+        if (date >= baseDate && log.bookPages) {
+          Object.values(log.bookPages).forEach(p => { totalPagesRead += (parseInt(p, 10) || 0); });
+        }
+      });
+    }
   }
 
-  let booksCompleted = (currentUser.books || []).filter(b => b.status === 'completed' || parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10)).length;
+  let booksCompleted = isPastBase ? (currentUser.books || []).filter(b => b.status === 'completed' || (parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10) && parseInt(b.totalPages, 10) > 0)).length : 0;
   let totalReps = 0;
-  if (currentUser.workoutLogs) {
-    Object.values(currentUser.workoutLogs).forEach(l => {
-      if (l.exercises) Object.values(l.exercises).forEach(e => { totalReps += (parseInt(e.done, 10) || 0); });
+  if (isPastBase && currentUser.workoutLogs) {
+    Object.entries(currentUser.workoutLogs).forEach(([date, l]) => {
+      if (date >= baseDate && l.exercises) {
+        Object.values(l.exercises).forEach(e => { totalReps += (parseInt(e.done, 10) || 0); });
+      }
     });
   }
 
   let totalStudyTasks = 0;
   let totalStudySessions = 0;
   let accaStudyTextPages = 0;
-  if (currentUser.studyLogs) {
-    Object.values(currentUser.studyLogs).forEach(log => {
-      if (log.scheduleDone) {
-        Object.values(log.scheduleDone).forEach(val => { totalStudyTasks += (parseInt(val, 10) || 0); });
+  if (isPastBase && currentUser.studyLogs) {
+    Object.entries(currentUser.studyLogs).forEach(([date, log]) => {
+      if (date >= baseDate) {
+        if (log.scheduleDone) {
+          Object.values(log.scheduleDone).forEach(val => { totalStudyTasks += (parseInt(val, 10) || 0); });
+        }
+        if (log.scheduleSets) {
+          Object.values(log.scheduleSets).forEach(arr => {
+            if (Array.isArray(arr)) totalStudySessions += arr.filter(v => v > 0).length;
+          });
+        }
       }
-      if (log.scheduleSets) {
-        Object.values(log.scheduleSets).forEach(arr => {
-          if (Array.isArray(arr)) totalStudySessions += arr.filter(v => v > 0).length;
+    });
+  }
+  if (isPastBase && currentUser.scheduleCompletions && currentUser.scheduleSlots) {
+    Object.entries(currentUser.scheduleCompletions).forEach(([dateStr, slotIds]) => {
+      if (dateStr >= baseDate) {
+        slotIds.forEach(slotId => {
+          const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
+          if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
+            totalStudySessions++;
+            if (slot.exercises) {
+              slot.exercises.forEach(ex => { totalStudyTasks += (parseInt(ex.target, 10) || 1); });
+            }
+          }
         });
       }
     });
   }
-  if (currentUser.scheduleCompletions && currentUser.scheduleSlots) {
-    Object.entries(currentUser.scheduleCompletions).forEach(([dateStr, slotIds]) => {
-      slotIds.forEach(slotId => {
-        const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
-        if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
-          totalStudySessions++;
-          if (slot.exercises) {
-            slot.exercises.forEach(ex => { totalStudyTasks += (parseInt(ex.target, 10) || 1); });
-          }
-        }
-      });
-    });
-  }
-  const accaBook = (currentUser.books || []).find(b => (b.id && b.id.includes('acca')) || (b.title && b.title.toLowerCase().includes('acca')));
-  if (accaBook) {
-    accaStudyTextPages = parseInt(accaBook.currentPage, 10) || parseInt(accaBook.basePage, 10) || 0;
+  if (isPastBase) {
+    const accaBook = (currentUser.books || []).find(b => (b.id && b.id.includes('acca')) || (b.title && b.title.toLowerCase().includes('acca')));
+    if (accaBook) {
+      const cur = parseInt(accaBook.currentPage, 10) || 0;
+      const base = parseInt(accaBook.basePage, 10) || 0;
+      accaStudyTextPages = Math.max(0, cur - base);
+    }
   }
 
   let cleanDays = 0;
-  if (currentUser.workoutLogs) {
-    Object.values(currentUser.workoutLogs).forEach(log => {
-      if (log.status === 'success' || (log.penalty === 0 && log.exercises && Object.keys(log.exercises).length > 0)) {
-        cleanDays++;
+  if (isPastBase && currentUser.workoutLogs) {
+    Object.entries(currentUser.workoutLogs).forEach(([date, log]) => {
+      if (date >= baseDate) {
+        if (log.status === 'success' || (log.penalty === 0 && log.exercises && Object.keys(log.exercises).length > 0)) {
+          cleanDays++;
+        }
       }
     });
   }
@@ -5171,7 +5295,7 @@ function renderAchievements() {
 }
 
 function resetMyAchievements() {
-  if (!confirm('Вы точно хотите сбросить все свои достижения и начать заново с чистого листа (0/18)?')) return;
+  if (!confirm('Вы точно хотите сбросить все свои достижения и обнулить coins (0/18)?')) return;
   const username = currentUser ? (currentUser.username || 'shahbozjony').toLowerCase() : 'shahbozjony';
   const achievements = getAchievements();
   achievements.forEach(ach => {
@@ -5182,13 +5306,15 @@ function resetMyAchievements() {
   saveAchievements(achievements);
   if (currentUser) {
     currentUser.unlockedAchievementsHistory = [];
+    currentUser.coins = 0;
+    currentUser.achievementsBaseDate = '2026-11-09';
     saveCurrentUser();
   }
   renderAchievements();
   updateTrophyTopBadge();
   updateUserCoinsUI();
   renderLeaderboard();
-  alert('🧹 Все ваши достижения успешно сброшены! Прогресс обновлен (0/18).');
+  alert('🧹 Все ваши достижения и coins успешно сброшены! Прогресс (0/18), баланс 0 coins.');
 }
 
 function toggleAchievementForUser(achId) {
