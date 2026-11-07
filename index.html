@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=23">
+  <link rel="stylesheet" href="style.css?v=24">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -111,6 +111,9 @@
         </div>
         <div class="top-bar-actions">
           <div class="live-clock" id="liveClock">23:55</div>
+          <div class="gold-coins-badge" onclick="openShopView()" style="cursor: pointer;" title="Мой баланс Coins • Открыть магазин">
+            🪙 <span id="topCoinsCount">0</span>
+          </div>
           <button class="top-avatar-btn" onclick="openAchievementsModal()" title="Достижения Steam (🏆)" style="position: relative;">
             🏆
             <span class="ach-count-badge" id="topAchBadge">0</span>
@@ -340,20 +343,25 @@
           </div>
         </section>
 
-        <!-- TAB 4: ACHIEVEMENTS (ДОСТИЖЕНИЯ КАК В STEAM) -->
+        <!-- TAB 4: ACHIEVEMENTS, SHOP & LEADERBOARD (ГЕЙМИФИКАЦИЯ И НАГРАДЫ) -->
         <section id="viewAchievements" class="app-view hidden">
           <div class="steam-hero-card">
             <div class="steam-hero-top">
               <div>
-                <span class="badge-tag steam-badge-tag">🏆 Steam Showcase</span>
-                <h2 style="font-size: 20px; margin-top: 4px;">Витрина достижений</h2>
+                <span class="badge-tag steam-badge-tag">🏆 Steam Showcase & Game Hub</span>
+                <h2 style="font-size: 20px; margin-top: 4px;">Витрина и Награды</h2>
               </div>
-              <div class="steam-trophy-counter" id="steamTrophyCounter">
-                0 / 18 (0%)
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                <div class="gold-coins-badge" id="heroCoinsBadge" onclick="switchAchievementsSubTab('shop')" style="cursor: pointer;" title="Мой баланс Coins">
+                  🪙 <span id="heroCoinsCount">0</span> Coins
+                </div>
+                <div class="steam-trophy-counter" id="steamTrophyCounter">
+                  0 / 18 (0%)
+                </div>
               </div>
             </div>
             <p class="card-desc" style="margin-top: 4px; font-size: 12px;">
-              Выполняй цели по книгам, ACCA, тренировкам и делись трофеями с друзьями!
+              Закрывай цели по книгам, ACCA и тренировкам, зарабатывай Coins и открывай кастомизацию!
             </p>
 
             <div class="today-rep-bar-bg" style="margin-top: 12px; height: 10px;">
@@ -361,19 +369,102 @@
             </div>
           </div>
 
-          <!-- Filter tabs for achievements -->
-          <div class="day-filter-bar" style="margin: 12px 0 14px 0; overflow-x: auto; white-space: nowrap;">
-            <button class="day-filter-btn active" id="achFilter_all" onclick="setAchievementFilter('all')">Все (18)</button>
-            <button class="day-filter-btn" id="achFilter_reading" onclick="setAchievementFilter('reading')">📚 Книги</button>
-            <button class="day-filter-btn" id="achFilter_study" onclick="setAchievementFilter('study')">📑 ACCA</button>
-            <button class="day-filter-btn" id="achFilter_sport" onclick="setAchievementFilter('sport')">💪 Спорт</button>
-            <button class="day-filter-btn" id="achFilter_discipline" onclick="setAchievementFilter('discipline')">⚡ Дисциплина</button>
-            <button class="day-filter-btn" id="achFilter_unlocked" onclick="setAchievementFilter('unlocked')">✓ Открытые</button>
+          <!-- Achievements Subtabs Navigation -->
+          <div class="ach-subnav-bar">
+            <button class="ach-subnav-btn active" id="subtabBtn_trophies" onclick="switchAchievementsSubTab('trophies')">
+              <span>🏆 Достижения</span>
+            </button>
+            <button class="ach-subnav-btn" id="subtabBtn_shop" onclick="switchAchievementsSubTab('shop')">
+              <span>🏪 Магазин наград</span>
+            </button>
+            <button class="ach-subnav-btn" id="subtabBtn_leaderboard" onclick="switchAchievementsSubTab('leaderboard')">
+              <span>📊 Рейтинг онлайн</span>
+            </button>
           </div>
 
-          <!-- Container for rendered achievement cards -->
-          <div class="steam-achievements-list" id="steamAchievementsList">
-            <!-- Rendered dynamically by JS -->
+          <!-- SUBVIEW 1: TROPHIES & ACHIEVEMENTS -->
+          <div id="achSubView_trophies">
+            <!-- Filter tabs for achievements -->
+            <div class="day-filter-bar" style="margin: 0 0 14px 0; overflow-x: auto; white-space: nowrap;">
+              <button class="day-filter-btn active" id="achFilter_all" onclick="setAchievementFilter('all')">Все (18)</button>
+              <button class="day-filter-btn" id="achFilter_reading" onclick="setAchievementFilter('reading')">📚 Книги</button>
+              <button class="day-filter-btn" id="achFilter_study" onclick="setAchievementFilter('study')">📑 ACCA</button>
+              <button class="day-filter-btn" id="achFilter_sport" onclick="setAchievementFilter('sport')">💪 Спорт</button>
+              <button class="day-filter-btn" id="achFilter_discipline" onclick="setAchievementFilter('discipline')">⚡ Дисциплина</button>
+              <button class="day-filter-btn" id="achFilter_unlocked" onclick="setAchievementFilter('unlocked')">✓ Открытые</button>
+            </div>
+
+            <!-- Container for rendered achievement cards -->
+            <div class="steam-achievements-list" id="steamAchievementsList">
+              <!-- Rendered dynamically by JS -->
+            </div>
+
+            <div style="margin-top: 16px; text-align: center;">
+              <button type="button" class="cancel-btn" style="font-size: 11px; opacity: 0.7; padding: 8px 14px;" onclick="resetMyAchievements()">
+                🧹 Сбросить мои достижения (начать заново с 0)
+              </button>
+            </div>
+          </div>
+
+          <!-- SUBVIEW 2: SHOP FOR COINS -->
+          <div id="achSubView_shop" class="hidden">
+            <div class="shop-hero-card">
+              <div>
+                <span style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #fbbf24; letter-spacing: 0.5px;">🏪 Магазин эксклюзивов</span>
+                <h3 style="font-size: 16px; margin-top: 2px;">Кастомизация профиля за Coins</h3>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                  Зарабатывайте Coins за выполнение достижений и покупайте огненные шрифты и значки!
+                </p>
+              </div>
+              <div class="gold-coins-badge" style="font-size: 16px; padding: 8px 16px;">
+                🪙 <span id="shopBalanceCoins">0</span> Coins
+              </div>
+            </div>
+
+            <h4 style="font-size: 14px; font-weight: 800; margin: 16px 0 10px 0; color: var(--accent-orange); display: flex; align-items: center; gap: 6px;">
+              <span>🔥</span> Горящие шрифты для никнейма (буквы горят и сияют)
+            </h4>
+            <div class="shop-grid" id="shopFontsGrid">
+              <!-- Rendered by JS -->
+            </div>
+
+            <h4 style="font-size: 14px; font-weight: 800; margin: 20px 0 10px 0; color: #60a5fa; display: flex; align-items: center; gap: 6px;">
+              <span>⚡</span> Значки в логин (как в Telegram Plus)
+            </h4>
+            <div class="shop-grid" id="shopBadgesGrid">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+          <!-- SUBVIEW 3: LEADERBOARD TABLE -->
+          <div id="achSubView_leaderboard" class="hidden">
+            <div class="leaderboard-card">
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <span class="badge-tag">🏆 Общий зачёт</span>
+                  <h3 style="font-size: 17px; margin-top: 3px;">Онлайн-рейтинг участников</h3>
+                </div>
+                <div style="font-size: 12px; color: var(--text-dim);">
+                  Сортировка по открытым достижениям и Coins
+                </div>
+              </div>
+
+              <div class="leaderboard-table-wrap">
+                <table class="leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th class="lb-rank">№</th>
+                      <th>Участник</th>
+                      <th style="text-align: center;">Достижений</th>
+                      <th style="text-align: right;">Coins</th>
+                    </tr>
+                  </thead>
+                  <tbody id="leaderboardTableBody">
+                    <!-- Rendered dynamically by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1017,6 +1108,6 @@
 
   </div>
 
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
