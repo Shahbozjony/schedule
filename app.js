@@ -143,6 +143,30 @@ function ensureUserDefaults() {
   if (!currentUser.telegramConfig) {
     currentUser.telegramConfig = { token: '', chatId: '', notifyBlocks: true, notifyPenalties: true };
   }
+
+  // Clear penalties for today and all past days as requested
+  const todayKey = getTodayDateKey();
+  if (!currentUser.penaltiesClearedUntil || currentUser.penaltiesClearedUntil < todayKey) {
+    currentUser.penaltiesClearedUntil = todayKey;
+    if (currentUser.workoutLogs) {
+      Object.keys(currentUser.workoutLogs).forEach(date => {
+        if (date <= todayKey && currentUser.workoutLogs[date]) {
+          currentUser.workoutLogs[date].penalty = 0;
+        }
+      });
+    }
+  }
+
+  // Ensure exercises have valid days
+  if (!currentUser.exercises || currentUser.exercises.length === 0) {
+    currentUser.exercises = JSON.parse(JSON.stringify(DEFAULT_EXERCISES));
+  }
+  currentUser.exercises.forEach(ex => {
+    if (!ex.days || !Array.isArray(ex.days) || ex.days.length === 0) {
+      ex.days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    }
+  });
+
   initUserExercises();
   saveCurrentUser();
 }
@@ -563,18 +587,121 @@ function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз
   const container = document.getElementById('slotExercisesContainer');
   const row = document.createElement('div');
   row.className = 'slot-ex-row';
+
+  const userExercises = (currentUser && currentUser.exercises) || DEFAULT_EXERCISES;
+  let optionsHtml = `<option value="">-- Выберите из базы --</option>`;
+  let matched = false;
+
+  userExercises.forEach(ex => {
+    const isSelected = ex.name === name;
+    if (isSelected) matched = true;
+    optionsHtml += `<option value="${escapeHtml(ex.name)}" ${isSelected ? 'selected' : ''}>${ex.icon || '🏋️'} ${escapeHtml(ex.name)}</option>`;
+  });
+
+  if (name && !matched) {
+    optionsHtml += `<option value="${escapeHtml(name)}" selected>✏️ ${escapeHtml(name)}</option>`;
+  }
+
+  optionsHtml += `<option value="__new__">➕ Новое упражнение в базу...</option>`;
+  optionsHtml += `<option value="__custom__">✏️ Ввести другое вручную...</option>`;
+
   row.innerHTML = `
-    <input type="text" placeholder="Упражнение (Отжимания, Планка)" value="${escapeHtml(name)}" required class="ex-name-input">
+    <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение из базы или создайте новое">
+      ${optionsHtml}
+    </select>
     <input type="number" placeholder="Подх." min="1" max="100" value="${sets}" title="Количество подходов" class="ex-sets-input">
     <input type="number" placeholder="Цель" min="1" max="1000" value="${target}" title="Повторений или секунд" class="ex-target-input">
-    <select class="ex-unit-input">
+    <select class="ex-unit-input" title="Единица измерения">
       <option value="раз" ${unit === 'раз' ? 'selected' : ''}>раз</option>
       <option value="сек" ${unit === 'сек' ? 'selected' : ''}>сек</option>
       <option value="мин" ${unit === 'мин' ? 'selected' : ''}>мин</option>
     </select>
-    <button type="button" class="slot-ex-delete-btn" onclick="this.parentElement.remove()">✕</button>
+    <button type="button" class="slot-ex-delete-btn" onclick="this.parentElement.remove()" title="Удалить строку">✕</button>
   `;
   container.appendChild(row);
+}
+
+function onSlotExerciseSelectChanged(selectEl) {
+  const val = selectEl.value;
+  const row = selectEl.closest('.slot-ex-row');
+  if (!row) return;
+
+  if (val === '__custom__') {
+    const customName = prompt('Введите название упражнения:');
+    if (customName && customName.trim()) {
+      const opt = document.createElement('option');
+      opt.value = customName.trim();
+      opt.textContent = '✏️ ' + customName.trim();
+      opt.selected = true;
+      selectEl.insertBefore(opt, selectEl.lastElementChild.previousElementSibling);
+    } else {
+      selectEl.value = '';
+    }
+    return;
+  }
+
+  if (val === '__new__') {
+    const newName = prompt('Добавить упражнение в базу тренировок.\n\nВведите название (например: Жим гантелей):');
+    if (newName && newName.trim()) {
+      const trimmedName = newName.trim();
+      const isPlank = trimmedName.toLowerCase().includes('планк') || trimmedName.toLowerCase().includes('удержан');
+      const newEx = {
+        id: 'ex_' + Date.now(),
+        name: trimmedName,
+        icon: isPlank ? '⏱️' : '🏋️',
+        type: isPlank ? 'reps' : 'sets',
+        target: isPlank ? 60 : 4,
+        days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+      };
+      if (!currentUser.exercises) currentUser.exercises = [];
+      currentUser.exercises.push(newEx);
+      saveCurrentUser();
+      renderPushups();
+      renderReport();
+
+      const opt = document.createElement('option');
+      opt.value = newEx.name;
+      opt.textContent = `${newEx.icon} ${newEx.name}`;
+      opt.selected = true;
+      selectEl.insertBefore(opt, selectEl.lastElementChild.previousElementSibling);
+
+      const setsInput = row.querySelector('.ex-sets-input');
+      const targetInput = row.querySelector('.ex-target-input');
+      const unitSelect = row.querySelector('.ex-unit-input');
+      if (newEx.type === 'sets') {
+        if (setsInput) setsInput.value = newEx.target;
+        if (targetInput) targetInput.value = 10;
+        if (unitSelect) unitSelect.value = 'раз';
+      } else {
+        if (setsInput) setsInput.value = 3;
+        if (targetInput) targetInput.value = newEx.target;
+        if (unitSelect) unitSelect.value = isPlank ? 'сек' : 'раз';
+      }
+    } else {
+      selectEl.value = '';
+    }
+    return;
+  }
+
+  if (currentUser && currentUser.exercises) {
+    const matched = currentUser.exercises.find(e => e.name === val);
+    if (matched) {
+      const setsInput = row.querySelector('.ex-sets-input');
+      const targetInput = row.querySelector('.ex-target-input');
+      const unitSelect = row.querySelector('.ex-unit-input');
+      const isPlank = matched.id.includes('plank') || matched.name.toLowerCase().includes('планк');
+
+      if (matched.type === 'sets') {
+        if (setsInput) setsInput.value = matched.target || 4;
+        if (targetInput) targetInput.value = 10;
+        if (unitSelect) unitSelect.value = 'раз';
+      } else {
+        if (setsInput) setsInput.value = isPlank ? 3 : 1;
+        if (targetInput) targetInput.value = matched.target || 50;
+        if (unitSelect) unitSelect.value = isPlank ? 'сек' : 'раз';
+      }
+    }
+  }
 }
 
 function saveScheduleSlot(e) {
@@ -592,11 +719,12 @@ function saveScheduleSlot(e) {
   const exercises = [];
   const rows = document.querySelectorAll('#slotExercisesContainer .slot-ex-row');
   rows.forEach(r => {
-    const exName = r.querySelector('.ex-name-input').value.trim();
+    const nameEl = r.querySelector('.ex-name-select') || r.querySelector('.ex-name-input');
+    const exName = nameEl ? nameEl.value.trim() : '';
     const sets = parseInt(r.querySelector('.ex-sets-input').value, 10) || 1;
     const target = parseInt(r.querySelector('.ex-target-input').value, 10) || 10;
     const unit = r.querySelector('.ex-unit-input').value || 'раз';
-    if (exName) {
+    if (exName && exName !== '__new__' && exName !== '__custom__') {
       exercises.push({ name: exName, sets, target, unit });
     }
   });
@@ -885,18 +1013,21 @@ function renderPushups() {
     }
   } else {
     todayLog.status = 'pending';
-    todayLog.penalty = 5000;
+    const isTodayWaived = currentUser.penaltiesClearedUntil && (todayKey <= currentUser.penaltiesClearedUntil);
+    todayLog.penalty = isTodayWaived ? 0 : 5000;
     if (penaltyStat) {
-      penaltyStat.textContent = '5 000 сум';
-      penaltyStat.style.color = 'var(--accent-red)';
+      penaltyStat.textContent = isTodayWaived ? '0 сум' : '5 000 сум';
+      penaltyStat.style.color = isTodayWaived ? 'var(--accent-green)' : 'var(--accent-red)';
     }
 
     if (verdictBox) {
-      verdictBox.className = 'day-verdict-box verdict-penalty';
+      verdictBox.className = isTodayWaived ? 'day-verdict-box' : 'day-verdict-box verdict-penalty';
       verdictBox.innerHTML = `
         <div>⚠️ ТРЕНИРОВКА В ПРОЦЕССЕ (${completedCount}/${visibleExercises.length})</div>
         <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
-          Закрой упражнения плана до полуночи, иначе штраф составит <b>5 000 сум</b>!
+          ${isTodayWaived 
+            ? '✓ Штрафы за сегодня списаны (0 сум). Выполняй упражнения в удовольствие!' 
+            : 'Закрой упражнения плана до полуночи, иначе штраф составит <b>5 000 сум</b>!'}
         </div>
       `;
     }
@@ -1003,7 +1134,14 @@ function openAddExerciseModal() {
   document.getElementById('newExerciseType').value = 'sets';
   document.getElementById('newExerciseTarget').value = '4';
   document.getElementById('newExTargetLabel').textContent = 'Целевое количество подходов';
+  document.querySelectorAll('#newExerciseDaysGrid input[type="checkbox"]').forEach(cb => {
+    cb.checked = true;
+  });
   document.getElementById('exerciseModal').classList.remove('hidden');
+}
+
+function openExerciseModal() {
+  openAddExerciseModal();
 }
 
 function closeExerciseModal() {
@@ -1030,13 +1168,20 @@ function saveCustomExercise(e) {
   const type = document.getElementById('newExerciseType').value;
   const target = parseInt(document.getElementById('newExerciseTarget').value, 10) || 4;
 
-  const icons = { sets: '🏋️', reps: '💥' };
+  const days = [];
+  document.querySelectorAll('#newExerciseDaysGrid input:checked').forEach(cb => {
+    days.push(cb.value);
+  });
+
+  const isPlank = name.toLowerCase().includes('планк') || name.toLowerCase().includes('удержан');
+  const icons = { sets: '🏋️', reps: isPlank ? '⏱️' : '💥' };
   const newEx = {
     id: 'ex_' + Date.now(),
     name,
     icon: icons[type] || '💪',
     type,
-    target
+    target,
+    days: days.length > 0 ? days : ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
   };
 
   currentUser.exercises.push(newEx);
@@ -1125,6 +1270,33 @@ function changePenaltyMonth(delta) {
   renderPenalties();
 }
 
+function clearAllPenalties(showConfirm = true) {
+  if (showConfirm && !confirm('Списать все штрафы за предыдущие дни и за сегодня?\n\nБаланс штрафов станет 0 сум.')) {
+    return;
+  }
+  if (!currentUser) return;
+
+  const todayKey = getTodayDateKey();
+  currentUser.penaltiesClearedUntil = todayKey;
+
+  // Clear workout penalty for today and all recorded dates
+  if (currentUser.workoutLogs) {
+    Object.keys(currentUser.workoutLogs).forEach(date => {
+      if (date <= todayKey && currentUser.workoutLogs[date]) {
+        currentUser.workoutLogs[date].penalty = 0;
+      }
+    });
+  }
+
+  saveCurrentUser();
+  renderPenalties();
+  renderPushups();
+  renderReport();
+  if (showConfirm) {
+    alert('Все штрафы успешно списаны! Текущий баланс штрафов: 0 сум 🎉');
+  }
+}
+
 function renderPenalties() {
   if (!currentUser) return;
 
@@ -1180,6 +1352,21 @@ function renderPenalties() {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const completedList = (currentUser.scheduleCompletions && currentUser.scheduleCompletions[dateKey]) || [];
     const isToday = isCurrentMonth && day === today.getDate();
+    const isWaived = currentUser.penaltiesClearedUntil && (dateKey <= currentUser.penaltiesClearedUntil);
+
+    if (isWaived) {
+      successDays++;
+      const row = document.createElement('div');
+      row.className = 'month-day-row success';
+      row.innerHTML = `
+        <div style="display: flex; justify-content: space-between; width: 100%;">
+          <span>${day} ${monthNames[month]} ${isToday ? '(Сегодня)' : ''}</span>
+          <span class="text-green">✓ Штрафы списаны (0 сум)</span>
+        </div>
+      `;
+      daysListEl.prepend(row);
+      continue;
+    }
 
     // Check which slots were missed for this day
     const missedSlots = [];
@@ -1345,13 +1532,15 @@ function renderReport() {
     }
 
     // Missed blocks penalty for that date
-    slots.forEach(s => {
-      if (!dayCompletedSlotIds.includes(s.id)) {
-        if (diffDays > 0) {
-          totalPenalty += (s.penalty || DEFAULT_PENALTY_AMOUNT);
+    if (!currentUser.penaltiesClearedUntil || dateStr > currentUser.penaltiesClearedUntil) {
+      slots.forEach(s => {
+        if (!dayCompletedSlotIds.includes(s.id)) {
+          if (diffDays > 0) {
+            totalPenalty += (s.penalty || DEFAULT_PENALTY_AMOUNT);
+          }
         }
-      }
-    });
+      });
+    }
   });
 
   // Update Big Cards
@@ -1361,6 +1550,12 @@ function renderReport() {
     : `${totalPlankSecs} сек`;
   document.getElementById('repTotalBlocksDone').textContent = totalBlocksDone;
   document.getElementById('repTotalPenalty').textContent = formatCurrencyUZS(totalPenalty);
+
+  // Render Section 1: Today's Workout Execution vs Plan
+  renderTodayWorkoutReport();
+
+  // Render Section 2: Weekly Workout Days Matrix
+  renderWeekDaysScheduleMatrix();
 
   // Render Category Breakdown
   const catListEl = document.getElementById('categoriesReportList');
@@ -1385,7 +1580,7 @@ function renderReport() {
     });
   }
 
-  // Render Exercise Breakdown
+  // Render Section 3: Exercise Volume for Period
   const exListEl = document.getElementById('exerciseReportList');
   if (exListEl && currentUser.exercises) {
     exListEl.innerHTML = '';
@@ -1393,19 +1588,167 @@ function renderReport() {
       const row = document.createElement('div');
       row.className = 'exercise-report-item';
       
-      const isPlank = ex.id.includes('plank');
+      const isPlank = ex.id.includes('plank') || ex.name.toLowerCase().includes('планк');
+      let valText = '';
+      if (isPlank) {
+        valText = `${totalPlankSecs} сек в планке`;
+      } else if (ex.type === 'sets') {
+        valText = `Цель: ${ex.target} подх.`;
+      } else {
+        valText = `${totalReps} повторений`;
+      }
+
       row.innerHTML = `
         <div class="ex-rep-title">
           <span>${ex.icon || '🏋️'}</span>
           <span>${escapeHtml(ex.name)}</span>
         </div>
         <div class="ex-rep-val">
-          ${isPlank ? `${totalPlankSecs} сек` : (ex.type === 'sets' ? `Цель: ${ex.target} подх.` : `Норма: ${ex.target} раз`)}
+          ${valText}
         </div>
       `;
       exListEl.appendChild(row);
     });
   }
+}
+
+function renderTodayWorkoutReport() {
+  const container = document.getElementById('todayWorkoutReportList');
+  if (!container || !currentUser) return;
+  container.innerHTML = '';
+
+  const dayIndex = new Date().getDay();
+  const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayCode = dayMap[dayIndex];
+  const todayKey = getTodayDateKey();
+  const todayLog = (currentUser.workoutLogs && currentUser.workoutLogs[todayKey]) || { exercises: {} };
+
+  const exercises = currentUser.exercises || [];
+
+  const todaySub = document.getElementById('repTodaySubtitle');
+  if (todaySub) {
+    todaySub.textContent = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
+  exercises.forEach(ex => {
+    const isScheduled = ex.days && ex.days.includes(todayCode);
+    const exData = (todayLog.exercises && todayLog.exercises[ex.id]) || { done: 0, sets: [] };
+    const isPlank = ex.id.includes('plank') || ex.name.toLowerCase().includes('планк');
+
+    let done = 0;
+    let target = ex.target || 1;
+    let unit = isPlank ? 'сек' : (ex.type === 'sets' ? 'подх.' : 'раз');
+    let isDone = false;
+
+    if (ex.type === 'sets') {
+      const sets = exData.sets || [];
+      done = sets.length;
+      isDone = done >= target || exData.completed;
+    } else {
+      done = exData.done || 0;
+      isDone = done >= target || exData.completed;
+    }
+
+    const pct = Math.min(100, Math.round((done / target) * 100));
+
+    let badgeHtml = '';
+    if (isScheduled) {
+      if (isDone) {
+        badgeHtml = `<span class="rep-badge done">✓ Выполнено (${done} / ${target} ${unit})</span>`;
+      } else if (done > 0) {
+        badgeHtml = `<span class="rep-badge in-progress">⏳ В процессе (${done} / ${target} ${unit})</span>`;
+      } else {
+        badgeHtml = `<span class="rep-badge pending">❌ Не сделано (План: ${target} ${unit})</span>`;
+      }
+    } else {
+      if (done > 0) {
+        badgeHtml = `<span class="rep-badge in-progress">🔥 Вне плана: ${done} ${unit}</span>`;
+      } else {
+        badgeHtml = `<span class="rep-badge rest">🌴 День отдыха</span>`;
+      }
+    }
+
+    const item = document.createElement('div');
+    item.className = `today-workout-report-item ${isDone && isScheduled ? 'done' : ''}`;
+    item.innerHTML = `
+      <div class="today-rep-top">
+        <div class="today-rep-name">
+          <span>${ex.icon || '🏋️'}</span>
+          <span>${escapeHtml(ex.name)}</span>
+        </div>
+        ${badgeHtml}
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-top: 4px;">
+        <span>${isScheduled ? `По плану на сегодня (Цель: ${target} ${unit})` : 'Не запланировано на сегодня'}</span>
+        <span style="font-weight: 700; color: ${isDone ? 'var(--accent-green)' : 'var(--text-normal)'};">${pct}%</span>
+      </div>
+      <div class="today-rep-bar-bg">
+        <div class="today-rep-bar-fill" style="width: ${pct}%; background-color: ${isDone ? 'var(--accent-green)' : (done > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+function renderWeekDaysScheduleMatrix() {
+  const container = document.getElementById('weekDaysScheduleMatrix');
+  if (!container || !currentUser) return;
+  container.innerHTML = '';
+
+  const dayIndex = new Date().getDay();
+  const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayCode = dayMap[dayIndex];
+
+  const daysConfig = [
+    { code: 'mon', label: 'Понедельник' },
+    { code: 'tue', label: 'Вторник' },
+    { code: 'wed', label: 'Среда' },
+    { code: 'thu', label: 'Четверг' },
+    { code: 'fri', label: 'Пятница' },
+    { code: 'sat', label: 'Суббота' },
+    { code: 'sun', label: 'Воскресенье' }
+  ];
+
+  const exercises = currentUser.exercises || [];
+
+  daysConfig.forEach(d => {
+    const isToday = d.code === todayCode;
+    const dayExercises = exercises.filter(ex => ex.days && ex.days.includes(d.code));
+
+    const card = document.createElement('div');
+    card.className = `week-split-day-card ${isToday ? 'today' : ''}`;
+
+    let chipsHtml = '';
+    if (dayExercises.length > 0) {
+      chipsHtml = dayExercises.map(ex => {
+        const isPlank = ex.id.includes('plank') || ex.name.toLowerCase().includes('планк');
+        const unit = isPlank ? 'сек' : (ex.type === 'sets' ? 'подх.' : 'раз');
+        return `
+          <span class="week-split-ex-chip">
+            ${ex.icon || '🏋️'} <b>${escapeHtml(ex.name)}</b>: ${ex.target} ${unit}
+          </span>
+        `;
+      }).join('');
+    } else {
+      chipsHtml = `<span class="week-split-ex-chip empty">🌴 Полный отдых / Восстановление</span>`;
+    }
+
+    card.innerHTML = `
+      <div class="week-split-day-header">
+        <div class="week-split-day-title">
+          <span>📅 ${d.label}</span>
+          ${isToday ? '<span class="week-split-today-badge">СЕГОДНЯ</span>' : ''}
+        </div>
+        <span style="font-size: 11px; font-weight: 700; color: ${dayExercises.length > 0 ? 'var(--accent-primary)' : 'var(--text-dim)'};">
+          ${dayExercises.length} упр.
+        </span>
+      </div>
+      <div class="week-split-ex-list">
+        ${chipsHtml}
+      </div>
+    `;
+    container.appendChild(card);
+  });
 }
 
 /* =========================================================
