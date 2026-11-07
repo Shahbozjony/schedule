@@ -7216,7 +7216,7 @@ function closeRanksModal() {
 }
 
 function switchAchievementsSubTab(subTab) {
-  ['trophies', 'ranks', 'shop', 'leaderboard'].forEach(t => {
+  ['trophies', 'shop', 'leaderboard'].forEach(t => {
     const btn = document.getElementById(`subtabBtn_${t}`);
     const view = document.getElementById(`achSubView_${t}`);
     if (btn) {
@@ -7231,7 +7231,6 @@ function switchAchievementsSubTab(subTab) {
 
   updateRankHeroBanner();
   if (subTab === 'trophies') renderAchievements();
-  if (subTab === 'ranks') renderRanksContent(document.getElementById('ranksContainerInline'));
   if (subTab === 'shop') renderShop();
   if (subTab === 'leaderboard') renderLeaderboard();
 }
