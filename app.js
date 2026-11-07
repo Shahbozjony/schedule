@@ -129,6 +129,9 @@ function createDefaultUserProfile(name, username, password) {
     streak: 0,
     coins: 0,
     isPrivate: false,
+    friends: [],
+    friendRequestsSent: [],
+    friendRequestsReceived: [],
     inventory: [],
     equippedFont: '',
     equippedBadge: '',
@@ -363,6 +366,9 @@ function ensureUserDefaults() {
   if (!currentUser.equippedFont) currentUser.equippedFont = '';
   if (!currentUser.equippedBadge) currentUser.equippedBadge = '';
   if (currentUser.isPrivate === undefined) currentUser.isPrivate = false;
+  if (!currentUser.friends) currentUser.friends = [];
+  if (!currentUser.friendRequestsSent) currentUser.friendRequestsSent = [];
+  if (!currentUser.friendRequestsReceived) currentUser.friendRequestsReceived = [];
   if (!currentUser.unlockedAchievementsHistory) currentUser.unlockedAchievementsHistory = [];
 
   // MIGRATION v33: Reset schedule slots >= 2026-11-09, reset coins to 0 and achievements to 0/18
@@ -877,11 +883,100 @@ function initLiveClock() {
   setInterval(update, 1000);
 }
 
+function getUserLevelData(user) {
+  if (!user) {
+    return {
+      level: 1,
+      title: 'Новичок',
+      symbol: '🌱',
+      prefix: '🌱',
+      badgeTag: '🌱 Ур. 1',
+      frameClass: 'lvl-frame-1',
+      color: '#94a3b8',
+      unlockedCount: 0
+    };
+  }
+
+  const username = (user.username || '').toLowerCase();
+  const achievements = getAchievements();
+  const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz')).length;
+
+  if (unlockedCount >= 18) {
+    return {
+      level: 6,
+      title: 'Легенда Олимпа',
+      symbol: '👑',
+      prefix: '👑',
+      badgeTag: '👑 MAX (Ур. 6)',
+      frameClass: 'lvl-frame-6',
+      color: '#f43f5e',
+      unlockedCount
+    };
+  } else if (unlockedCount >= 13) {
+    return {
+      level: 5,
+      title: 'Грандмастер',
+      symbol: '💎',
+      prefix: '💎',
+      badgeTag: '💎 Ур. 5',
+      frameClass: 'lvl-frame-5',
+      color: '#38bdf8',
+      unlockedCount
+    };
+  } else if (unlockedCount >= 8) {
+    return {
+      level: 4,
+      title: 'Мастер OS',
+      symbol: '🥇',
+      prefix: '🔥🥇',
+      badgeTag: '🥇 Ур. 4',
+      frameClass: 'lvl-frame-4',
+      color: '#fbbf24',
+      unlockedCount
+    };
+  } else if (unlockedCount >= 4) {
+    return {
+      level: 3,
+      title: 'Воин дисциплины',
+      symbol: '🥈',
+      prefix: '⚡🥈',
+      badgeTag: '🥈 Ур. 3',
+      frameClass: 'lvl-frame-3',
+      color: '#cbd5e1',
+      unlockedCount
+    };
+  } else if (unlockedCount >= 1) {
+    return {
+      level: 2,
+      title: 'Искатель',
+      symbol: '🥉',
+      prefix: '🥉',
+      badgeTag: '🥉 Ур. 2',
+      frameClass: 'lvl-frame-2',
+      color: '#cd7f32',
+      unlockedCount
+    };
+  } else {
+    return {
+      level: 1,
+      title: 'Новичок',
+      symbol: '🌱',
+      prefix: '🌱',
+      badgeTag: '🌱 Ур. 1',
+      frameClass: 'lvl-frame-1',
+      color: '#94a3b8',
+      unlockedCount: 0
+    };
+  }
+}
+
 function getAvatarHtml(userOrAvatar, size = 38) {
   let av = null;
   let initial = 'Ш';
+  let targetUser = null;
   if (userOrAvatar) {
-    if (userOrAvatar.avatar !== undefined) {
+    if (userOrAvatar.username !== undefined || userOrAvatar.avatar !== undefined) {
+      targetUser = userOrAvatar;
       av = userOrAvatar.avatar;
       initial = (userOrAvatar.name || userOrAvatar.username || 'Ш').charAt(0).toUpperCase();
     } else {
@@ -889,43 +984,46 @@ function getAvatarHtml(userOrAvatar, size = 38) {
     }
   }
 
+  const lvl = getUserLevelData(targetUser);
+  const frameClass = lvl ? lvl.frameClass : 'lvl-frame-1';
+  const frameTitle = lvl ? `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/18 достижений)` : '';
+
+  let innerHtml = '';
   // 1. Gallery uploaded photo (data URL)
   if (av && av.type === 'image' && av.value) {
-    return `<div class="avatar-circle avatar-img-wrap" style="width:${size}px; height:${size}px;">
+    innerHtml = `<div class="avatar-circle avatar-img-wrap" style="width:100%; height:100%;">
       <img src="${escapeHtml(av.value)}" alt="Avatar" class="avatar-img" />
     </div>`;
-  }
-
-  // 2. Shop purchased exclusive art avatar
-  if (av && av.type === 'shop' && av.itemId) {
+  } else if (av && av.type === 'shop' && av.itemId) {
+    // 2. Shop purchased exclusive art avatar
     const shopItem = SHOP_ITEMS.find(i => i.id === av.itemId);
     const avData = (shopItem && shopItem.avatarData) || {};
     const icon = avData.icon || av.icon || '⭐';
     const bg = avData.bg || av.bg || 'linear-gradient(135deg, #1e1b4b, #312e81)';
     const glow = avData.glow || '';
-    const fontSize = Math.round(size * 0.52);
-    return `<div class="avatar-circle avatar-shop-circle" style="width:${size}px; height:${size}px; font-size:${fontSize}px; background:${bg}; box-shadow:${glow};">
+    const fontSize = Math.round(size * 0.48);
+    innerHtml = `<div class="avatar-circle avatar-shop-circle" style="width:100%; height:100%; font-size:${fontSize}px; background:${bg}; box-shadow:${glow};">
       ${icon}
     </div>`;
-  }
-
-  // 3. Custom text / emoji / number with custom background
-  if (av && av.type === 'text') {
+  } else if (av && av.type === 'text') {
+    // 3. Custom text / emoji / number with custom background
     const text = av.text || initial;
     const bg = av.bg || 'linear-gradient(135deg, #f43f5e, #f59e0b)';
     const color = av.color || '#ffffff';
     const len = Array.from(text).length;
-    const fontSize = len > 2 ? Math.round(size * 0.36) : (len > 1 ? Math.round(size * 0.44) : Math.round(size * 0.52));
-    return `<div class="avatar-circle avatar-custom-text" style="width:${size}px; height:${size}px; font-size:${fontSize}px; background:${bg}; color:${color}; font-weight:800;">
+    const fontSize = len > 2 ? Math.round(size * 0.34) : (len > 1 ? Math.round(size * 0.42) : Math.round(size * 0.48));
+    innerHtml = `<div class="avatar-circle avatar-custom-text" style="width:100%; height:100%; font-size:${fontSize}px; background:${bg}; color:${color}; font-weight:800;">
       ${escapeHtml(text)}
+    </div>`;
+  } else {
+    // 4. Default letter initial
+    const fontSize = Math.round(size * 0.44);
+    innerHtml = `<div class="avatar-circle avatar-default" style="width:100%; height:100%; font-size:${fontSize}px; font-weight:800;">
+      ${escapeHtml(initial)}
     </div>`;
   }
 
-  // 4. Default letter initial
-  const fontSize = Math.round(size * 0.48);
-  return `<div class="avatar-circle avatar-default" style="width:${size}px; height:${size}px; font-size:${fontSize}px; font-weight:800;">
-    ${escapeHtml(initial)}
-  </div>`;
+  return `<div class="avatar-framed-container ${frameClass}" style="width:${size}px; height:${size}px;" title="${escapeHtml(frameTitle)}">${innerHtml}</div>`;
 }
 
 function renderUserProfile() {
@@ -936,6 +1034,13 @@ function renderUserProfile() {
 
   const fontClass = currentUser.equippedFont || '';
   const badgeHtml = getBadgeHtml(currentUser.equippedBadge);
+  const lvl = getUserLevelData(currentUser);
+
+  const userLevelChip = document.getElementById('userLevelChip');
+  if (userLevelChip) {
+    userLevelChip.textContent = lvl.prefix;
+    userLevelChip.title = `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/18 достижений)`;
+  }
 
   const displayName = document.getElementById('displayName');
   if (displayName) {
@@ -950,6 +1055,13 @@ function renderUserProfile() {
   if (profileName) {
     profileName.className = fontClass;
     profileName.innerHTML = `${escapeHtml(currentUser.name)} ${badgeHtml}`;
+  }
+
+  const profileLevelBadge = document.getElementById('profileLevelBadge');
+  if (profileLevelBadge) {
+    profileLevelBadge.textContent = `${lvl.prefix} ${lvl.title} (Ур. ${lvl.level})`;
+    profileLevelBadge.className = `profile-level-badge ${lvl.frameClass}`;
+    profileLevelBadge.title = `Прогресс: ${lvl.unlockedCount} из 18 достижений`;
   }
 
   const profileUsername = document.getElementById('profileUsername');
@@ -986,6 +1098,296 @@ function renderUserProfile() {
       privacyBadge.className = 'privacy-status-pill';
     }
   }
+
+  // Populate Friends & Requests
+  renderProfileFriends();
+}
+
+function renderProfileFriends() {
+  if (!currentUser) return;
+  const users = getAllUsers();
+
+  const friends = currentUser.friends || [];
+  const incoming = currentUser.friendRequestsReceived || [];
+
+  const friendsCountEl = document.getElementById('friendsSummaryCount');
+  if (friendsCountEl) {
+    const word = getRussianPlural(friends.length, 'друг', 'друга', 'друзей');
+    friendsCountEl.textContent = `${friends.length} ${word}`;
+  }
+
+  const incomingWrap = document.getElementById('incomingFriendRequestsWrap');
+  const incomingBadge = document.getElementById('incomingRequestsBadge');
+  const incomingList = document.getElementById('incomingRequestsList');
+
+  if (incoming.length > 0) {
+    if (incomingWrap) incomingWrap.classList.remove('hidden');
+    if (incomingBadge) incomingBadge.textContent = incoming.length;
+    if (incomingList) {
+      incomingList.innerHTML = '';
+      incoming.forEach(fromUname => {
+        const fromUser = users[fromUname.toLowerCase()] || { username: fromUname, name: fromUname };
+        const fLvl = getUserLevelData(fromUser);
+        const item = document.createElement('div');
+        item.className = 'friend-row-item';
+        item.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${getAvatarHtml(fromUser, 32)}
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #fff;">
+                <span class="user-level-chip">${fLvl.prefix}</span> ${escapeHtml(fromUser.name || fromUname)}
+              </div>
+              <div style="font-size: 11px; color: var(--text-dim);">@${escapeHtml(fromUname)}</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <button type="button" class="lb-friend-btn accept" onclick="acceptFriendRequest('${escapeHtml(fromUname)}')">✅ Принять</button>
+            <button type="button" class="lb-friend-btn decline" onclick="declineFriendRequest('${escapeHtml(fromUname)}')">❌</button>
+          </div>
+        `;
+        incomingList.appendChild(item);
+      });
+    }
+  } else {
+    if (incomingWrap) incomingWrap.classList.add('hidden');
+  }
+
+  const friendsList = document.getElementById('profileFriendsList');
+  if (friendsList) {
+    friendsList.innerHTML = '';
+    if (friends.length === 0) {
+      friendsList.innerHTML = `
+        <div style="padding: 12px; text-align: center; font-size: 12px; color: var(--text-dim); background: rgba(0,0,0,0.15); border-radius: var(--radius-sm); border: 1px dashed rgba(255,255,255,0.08);">
+          У вас пока нет друзей.<br>
+          <span style="color: #38bdf8; font-weight: 600; cursor: pointer;" onclick="toggleAddFriendBox()">+ Добавьте друга по логину</span> или найдите в «Рейтинг онлайн»!
+        </div>
+      `;
+    } else {
+      friends.forEach(fUname => {
+        const friendUser = users[fUname.toLowerCase()] || { username: fUname, name: fUname };
+        const fLvl = getUserLevelData(friendUser);
+        const fCoins = friendUser.coins || 0;
+        const item = document.createElement('div');
+        item.className = 'friend-row-item';
+        item.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${getAvatarHtml(friendUser, 34)}
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #fff;">
+                <span class="user-level-chip">${fLvl.prefix}</span> ${escapeHtml(friendUser.name || fUname)}
+              </div>
+              <div style="font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px;">
+                <span>@${escapeHtml(fUname)}</span>
+                <span>• 🏆 ${fLvl.unlockedCount}/18</span>
+                <span>• 🪙 ${fCoins}</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="lb-friend-badge" onclick="confirmRemoveFriend('${escapeHtml(fUname)}')" title="Удалить из друзей">
+            🤝 Друзья
+          </button>
+        `;
+        friendsList.appendChild(item);
+      });
+    }
+  }
+}
+
+function getRussianPlural(number, one, two, five) {
+  let n = Math.abs(number) % 100;
+  let n1 = n % 10;
+  if (n > 10 && n < 20) return five;
+  if (n1 > 1 && n1 < 5) return two;
+  if (n1 === 1) return one;
+  return five;
+}
+
+function toggleAddFriendBox() {
+  const box = document.getElementById('addFriendBox');
+  if (box) {
+    box.classList.toggle('hidden');
+    if (!box.classList.contains('hidden')) {
+      const inp = document.getElementById('addFriendUsernameInput');
+      if (inp) inp.focus();
+    }
+  }
+}
+
+function submitAddFriendInput() {
+  const inp = document.getElementById('addFriendUsernameInput');
+  if (!inp) return;
+  const val = inp.value.trim().replace(/^@/, '');
+  if (!val) {
+    alert('Введите логин пользователя!');
+    return;
+  }
+  sendFriendRequest(val);
+  inp.value = '';
+}
+
+function sendFriendRequest(targetUsername) {
+  if (!currentUser) return;
+  const targetLower = (targetUsername || '').trim().toLowerCase();
+  const currentLower = (currentUser.username || '').toLowerCase();
+
+  if (!targetLower) return;
+  if (targetLower === currentLower) {
+    alert('Вы не можете отправить запрос в друзья самому себе!');
+    return;
+  }
+
+  const users = getAllUsers();
+  const targetUser = users[targetLower];
+  if (!targetUser) {
+    alert(`Пользователь @${targetUsername} не найден в системе.`);
+    return;
+  }
+
+  if (!currentUser.friends) currentUser.friends = [];
+  if (!currentUser.friendRequestsSent) currentUser.friendRequestsSent = [];
+  if (!targetUser.friends) targetUser.friends = [];
+  if (!targetUser.friendRequestsReceived) targetUser.friendRequestsReceived = [];
+
+  if (currentUser.friends.includes(targetLower)) {
+    alert(`Пользователь @${targetUsername} уже у вас в друзьях!`);
+    return;
+  }
+
+  if (currentUser.friendRequestsSent.includes(targetLower)) {
+    alert(`Вы уже отправили запрос пользователю @${targetUsername}. Ожидайте ответа!`);
+    return;
+  }
+
+  // If other user already requested you, auto accept
+  if ((currentUser.friendRequestsReceived || []).includes(targetLower)) {
+    acceptFriendRequest(targetLower);
+    return;
+  }
+
+  currentUser.friendRequestsSent.push(targetLower);
+  targetUser.friendRequestsReceived.push(currentLower);
+
+  users[currentLower] = currentUser;
+  users[targetLower] = targetUser;
+  saveAllUsers(users);
+  saveCurrentUser();
+
+  playHapticSound('targetAchieved');
+  alert(`📨 Запрос в друзья отправлен @${targetUsername}!`);
+  renderUserProfile();
+  renderLeaderboard();
+}
+
+function acceptFriendRequest(fromUsername) {
+  if (!currentUser) return;
+  const fromLower = (fromUsername || '').trim().toLowerCase();
+  const currentLower = (currentUser.username || '').toLowerCase();
+
+  const users = getAllUsers();
+  const fromUser = users[fromLower];
+
+  if (!currentUser.friends) currentUser.friends = [];
+  if (!currentUser.friendRequestsReceived) currentUser.friendRequestsReceived = [];
+  if (fromUser && !fromUser.friends) fromUser.friends = [];
+  if (fromUser && !fromUser.friendRequestsSent) fromUser.friendRequestsSent = [];
+
+  currentUser.friendRequestsReceived = currentUser.friendRequestsReceived.filter(u => u !== fromLower);
+  if (fromUser) {
+    fromUser.friendRequestsSent = fromUser.friendRequestsSent.filter(u => u !== currentLower);
+  }
+
+  if (!currentUser.friends.includes(fromLower)) {
+    currentUser.friends.push(fromLower);
+  }
+  if (fromUser && !fromUser.friends.includes(currentLower)) {
+    fromUser.friends.push(currentLower);
+  }
+
+  users[currentLower] = currentUser;
+  if (fromUser) users[fromLower] = fromUser;
+  saveAllUsers(users);
+  saveCurrentUser();
+
+  playHapticSound('targetAchieved');
+  alert(`🤝 Вы и @${fromUsername} теперь друзья!`);
+  renderUserProfile();
+  renderLeaderboard();
+}
+
+function declineFriendRequest(fromUsername) {
+  if (!currentUser) return;
+  const fromLower = (fromUsername || '').trim().toLowerCase();
+  const currentLower = (currentUser.username || '').toLowerCase();
+
+  const users = getAllUsers();
+  const fromUser = users[fromLower];
+
+  if (!currentUser.friendRequestsReceived) currentUser.friendRequestsReceived = [];
+  currentUser.friendRequestsReceived = currentUser.friendRequestsReceived.filter(u => u !== fromLower);
+
+  if (fromUser && fromUser.friendRequestsSent) {
+    fromUser.friendRequestsSent = fromUser.friendRequestsSent.filter(u => u !== currentLower);
+  }
+
+  users[currentLower] = currentUser;
+  if (fromUser) users[fromLower] = fromUser;
+  saveAllUsers(users);
+  saveCurrentUser();
+
+  playHapticSound('click');
+  renderUserProfile();
+  renderLeaderboard();
+}
+
+function cancelFriendRequest(targetUsername) {
+  if (!currentUser) return;
+  const targetLower = (targetUsername || '').trim().toLowerCase();
+  const currentLower = (currentUser.username || '').toLowerCase();
+
+  const users = getAllUsers();
+  const targetUser = users[targetLower];
+
+  if (!currentUser.friendRequestsSent) currentUser.friendRequestsSent = [];
+  currentUser.friendRequestsSent = currentUser.friendRequestsSent.filter(u => u !== targetLower);
+
+  if (targetUser && targetUser.friendRequestsReceived) {
+    targetUser.friendRequestsReceived = targetUser.friendRequestsReceived.filter(u => u !== currentLower);
+  }
+
+  users[currentLower] = currentUser;
+  if (targetUser) users[targetLower] = targetUser;
+  saveAllUsers(users);
+  saveCurrentUser();
+
+  playHapticSound('click');
+  renderUserProfile();
+  renderLeaderboard();
+}
+
+function confirmRemoveFriend(friendUsername) {
+  if (!confirm(`Вы действительно хотите удалить @${friendUsername} из списка друзей?`)) return;
+  if (!currentUser) return;
+  const friendLower = (friendUsername || '').trim().toLowerCase();
+  const currentLower = (currentUser.username || '').toLowerCase();
+
+  const users = getAllUsers();
+  const friendUser = users[friendLower];
+
+  if (currentUser.friends) {
+    currentUser.friends = currentUser.friends.filter(u => u !== friendLower);
+  }
+  if (friendUser && friendUser.friends) {
+    friendUser.friends = friendUser.friends.filter(u => u !== currentLower);
+  }
+
+  users[currentLower] = currentUser;
+  if (friendUser) users[friendLower] = friendUser;
+  saveAllUsers(users);
+  saveCurrentUser();
+
+  playHapticSound('click');
+  renderUserProfile();
+  renderLeaderboard();
 }
 
 function togglePrivacyMode(isChecked) {
@@ -5982,6 +6384,7 @@ function renderLeaderboard() {
       usernameHtml = `<div class="lb-user-foggy" title="Логин скрыт">@••••••••</div>`;
     } else {
       const badgeHtml = getBadgeHtml(item.equippedBadge);
+      const itemLvl = getUserLevelData(item.user);
       avatarHtml = `<div class="lb-avatar">${getAvatarHtml(item.user, 36)}</div>`;
       
       let selfPrivacyTag = '';
@@ -5990,11 +6393,41 @@ function renderLeaderboard() {
       }
 
       nameHtml = `
-        <div style="font-weight: 800;" class="${item.equippedFont}">
-          ${escapeHtml(item.displayName)} ${badgeHtml} ${selfPrivacyTag} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 4px;">(Вы)</span>' : ''}
+        <div style="font-weight: 800; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;" class="${item.equippedFont}">
+          <span class="user-level-chip" title="Уровень ${itemLvl.level}: ${itemLvl.title} (${itemLvl.unlockedCount}/18 достижений)">${itemLvl.prefix}</span>
+          <span>${escapeHtml(item.displayName)}</span> ${badgeHtml} ${selfPrivacyTag} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 2px;">(Вы)</span>' : ''}
         </div>
       `;
-      usernameHtml = `<div style="font-size: 11px; color: var(--text-dim);">@${escapeHtml(item.username)}</div>`;
+
+      let friendBtnHtml = '';
+      if (!isMe && currentUser) {
+        const targetLower = (item.username || '').toLowerCase();
+        const myFriends = currentUser.friends || [];
+        const mySent = currentUser.friendRequestsSent || [];
+        const myReceived = currentUser.friendRequestsReceived || [];
+
+        if (myFriends.includes(targetLower)) {
+          friendBtnHtml = `<span class="lb-friend-badge" onclick="confirmRemoveFriend('${escapeHtml(item.username)}')" title="Вы друзья (нажмите, чтобы удалить)">🤝 Друзья</span>`;
+        } else if (myReceived.includes(targetLower)) {
+          friendBtnHtml = `
+            <span style="display: inline-flex; gap: 3px;">
+              <button type="button" class="lb-friend-btn accept" onclick="acceptFriendRequest('${escapeHtml(item.username)}')" title="Принять запрос">✅ Принять</button>
+              <button type="button" class="lb-friend-btn decline" onclick="declineFriendRequest('${escapeHtml(item.username)}')" title="Отклонить">❌</button>
+            </span>
+          `;
+        } else if (mySent.includes(targetLower)) {
+          friendBtnHtml = `<button type="button" class="lb-friend-btn pending" onclick="cancelFriendRequest('${escapeHtml(item.username)}')" title="Запрос отправлен (нажмите, чтобы отменить)">⏳ Запрос</button>`;
+        } else {
+          friendBtnHtml = `<button type="button" class="lb-friend-btn add" onclick="sendFriendRequest('${escapeHtml(item.username)}')" title="Пригласить в друзья">➕ В друзья</button>`;
+        }
+      }
+
+      usernameHtml = `
+        <div style="font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+          <span>@${escapeHtml(item.username)}</span>
+          ${friendBtnHtml}
+        </div>
+      `;
     }
 
     tr.innerHTML = `
