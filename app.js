@@ -70,9 +70,7 @@ const DEFAULT_SCHEDULE_SLOTS = [
 // Default exercises
 const DEFAULT_EXERCISES = [
   { id: 'ex_pushups', name: 'Отжимания от пола', icon: '💥', type: 'reps', target: 50, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
-  { id: 'ex_bench', name: 'Жим штанги лежа', icon: '🏋️', type: 'sets', target: 4, days: ['mon', 'wed', 'fri'] },
-  { id: 'ex_triceps', name: 'Гантели на трицепс', icon: '💪', type: 'sets', target: 3, days: ['mon', 'wed', 'fri'] },
-  { id: 'ex_plank', name: 'Планка на предплечьях', icon: '⏱️', type: 'reps', target: 120, days: ['tue', 'thu', 'sat'] }
+  { id: 'ex_plank', name: 'Планка на предплечьях', icon: '⏱️', type: 'reps', target: 120, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] }
 ];
 
 // Default study & reading activities (ACCA, свободное чтение)
@@ -320,9 +318,11 @@ function ensureUserDefaults() {
     }
   }
 
-  // Ensure exercises have valid days
+  // Ensure exercises have valid days and remove unwanted bench / triceps
   if (!currentUser.exercises || currentUser.exercises.length === 0) {
     currentUser.exercises = JSON.parse(JSON.stringify(DEFAULT_EXERCISES));
+  } else {
+    currentUser.exercises = currentUser.exercises.filter(ex => ex.id !== 'ex_bench' && ex.id !== 'ex_triceps');
   }
   currentUser.exercises.forEach(ex => {
     if (!ex.days || !Array.isArray(ex.days) || ex.days.length === 0) {
@@ -1785,6 +1785,8 @@ function initUserExercises() {
   if (!currentUser) return;
   if (!currentUser.exercises || currentUser.exercises.length === 0) {
     currentUser.exercises = JSON.parse(JSON.stringify(DEFAULT_EXERCISES));
+  } else {
+    currentUser.exercises = currentUser.exercises.filter(ex => ex.id !== 'ex_bench' && ex.id !== 'ex_triceps');
   }
   
   // Ensure all exercises have a days array
@@ -2620,12 +2622,18 @@ function renderReport() {
   });
 
   // Update Big Cards
-  document.getElementById('repTotalReps').textContent = totalReps;
-  document.getElementById('repTotalPlank').textContent = totalPlankSecs > 60 
-    ? `${Math.floor(totalPlankSecs / 60)} мин ${totalPlankSecs % 60} сек`
-    : `${totalPlankSecs} сек`;
-  document.getElementById('repTotalBlocksDone').textContent = totalBlocksDone;
-  document.getElementById('repTotalPenalty').textContent = formatCurrencyUZS(totalPenalty);
+  const elReps = document.getElementById('repTotalReps');
+  if (elReps) elReps.textContent = totalReps;
+  const elPlank = document.getElementById('repTotalPlank');
+  if (elPlank) {
+    elPlank.textContent = totalPlankSecs > 60 
+      ? `${Math.floor(totalPlankSecs / 60)} мин ${totalPlankSecs % 60} сек`
+      : `${totalPlankSecs} сек`;
+  }
+  const elBlocks = document.getElementById('repTotalBlocksDone');
+  if (elBlocks) elBlocks.textContent = totalBlocksDone;
+  const elPenalty = document.getElementById('repTotalPenalty');
+  if (elPenalty) elPenalty.textContent = formatCurrencyUZS(totalPenalty);
 
   // Render Today's Schedule Workout Execution vs Plan
   renderTodayWorkoutReport();
