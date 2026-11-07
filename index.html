@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -679,6 +679,11 @@
         <div class="section-card account-actions-card">
           <h3>Управление аккаунтом</h3>
           
+          <button class="action-btn-row" onclick="forceAppUpdate()">
+            <span>🔄 Обновить приложение (сбросить кеш)</span>
+            <span class="chevron">›</span>
+          </button>
+
           <button class="action-btn-row" onclick="exportDataBackup()">
             <span>📥 Скачать резервную копию данных</span>
             <span class="chevron">›</span>
@@ -992,6 +997,6 @@
 
   </div>
 
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
