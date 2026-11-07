@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="style.css?v=38">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -367,12 +367,35 @@
             <div class="today-rep-bar-bg" style="margin-top: 12px; height: 10px;">
               <div id="steamOverallProgressBar" class="today-rep-bar-fill" style="width: 0%; background: linear-gradient(90deg, #f59e0b, #ec4899, #8b5cf6);"></div>
             </div>
+
+            <!-- Current User Rank Progress Card -->
+            <div class="user-rank-status-card" id="userRankStatusCard" onclick="switchAchievementsSubTab('ranks')" style="cursor: pointer;" title="Нажмите, чтобы открыть шкалу всех рангов">
+              <div class="rank-status-left">
+                <div class="rank-status-avatar-wrap" id="rankHeroAvatarWrap">
+                  <!-- Rendered by JS -->
+                </div>
+                <div class="rank-status-info">
+                  <div class="rank-status-top">
+                    <span class="rank-badge-pill" id="rankHeroPill">🛡️ Рекрут V</span>
+                    <span class="rank-pts-pill" id="rankHeroPts">1000 PTS</span>
+                  </div>
+                  <div class="rank-title-text" id="rankHeroTitle">Рекрут V</div>
+                  <div class="rank-next-text" id="rankHeroNextText">Открыто: 0 / 60 ачивок. До следующего ранга: 1 ачивка</div>
+                </div>
+              </div>
+              <div class="rank-status-action">
+                <button type="button" class="rank-view-ladder-btn" onclick="event.stopPropagation(); openRanksModal();">Таблица рангов ℹ️</button>
+              </div>
+            </div>
           </div>
 
           <!-- Achievements Subtabs Navigation -->
           <div class="ach-subnav-bar">
             <button class="ach-subnav-btn active" id="subtabBtn_trophies" onclick="switchAchievementsSubTab('trophies')">
               <span>🏆 Достижения</span>
+            </button>
+            <button class="ach-subnav-btn" id="subtabBtn_ranks" onclick="switchAchievementsSubTab('ranks')">
+              <span>🎖️ Шкала рангов</span>
             </button>
             <button class="ach-subnav-btn" id="subtabBtn_shop" onclick="switchAchievementsSubTab('shop')">
               <span>🏪 Магазин наград</span>
@@ -405,6 +428,13 @@
               <button type="button" class="cancel-btn" style="font-size: 11px; opacity: 0.7; padding: 8px 14px;" onclick="resetMyAchievements()">
                 🧹 Сбросить мои достижения (начать заново с 0)
               </button>
+            </div>
+          </div>
+
+          <!-- SUBVIEW: RANKS & TIERS LADDER (ШКАЛА РАНГОВ И ИНСТРУКЦИЯ) -->
+          <div id="achSubView_ranks" class="hidden">
+            <div id="ranksContainerInline">
+              <!-- Rendered dynamically by JS -->
             </div>
           </div>
 
@@ -806,7 +836,12 @@
           </div>
           <h2 id="profileName" style="font-size: 18px;">Шахбоз</h2>
           <div id="profileLevelBadgeWrap" style="margin-top: 4px;">
-            <span id="profileLevelBadge" class="profile-level-badge">🌱 Новичок (Ур. 1)</span>
+            <span id="profileLevelBadge" class="profile-level-badge" onclick="openRanksModal()" style="cursor: pointer;" title="Нажмите, чтобы посмотреть все 26 рангов и условия">🌱 Новичок (Ур. 1)</span>
+          </div>
+          <div style="margin-top: 4px;">
+            <button type="button" class="link-btn-small" onclick="openRanksModal()" style="font-size: 11px; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.25);">
+              🏆 Шкала рангов и как достичь ℹ️
+            </button>
           </div>
           <div class="profile-username" id="profileUsername" style="margin-top: 4px;">@shahbozjony</div>
           <div style="margin-top: 8px;">
@@ -1310,10 +1345,34 @@
       </div>
     </div>
 
+    <!-- MODAL: RANKS & TIERS LADDER (ШКАЛА РАНГОВ И ИНСТРУКЦИЯ) -->
+    <div id="ranksModal" class="modal-overlay hidden" onclick="if(event.target === this) closeRanksModal()">
+      <div class="modal-card modal-large" style="max-height: 90vh; overflow-y: auto; max-width: 650px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 24px;">🏛️</span>
+            <div>
+              <h3 style="font-size: 17px; font-weight: 800;">Шкала рангов и уровней</h3>
+              <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                26 рангов дисциплины: от Рекрута V до Легенды Олимпа MAX
+              </p>
+            </div>
+          </div>
+          <button type="button" class="close-modal-btn" onclick="closeRanksModal()">×</button>
+        </div>
+        <div id="ranksContainerModal" style="padding-top: 4px;">
+          <!-- Rendered dynamically by JS -->
+        </div>
+        <div class="modal-buttons" style="margin-top: 14px;">
+          <button type="button" class="primary-btn" style="width: 100%;" onclick="closeRanksModal()">Понятно, идти к целям! 🚀</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ACHIEVEMENTS ARE NOW MAIN VIEW 4 (viewAchievements) -->
 
   </div>
 
-  <script src="app.js?v=37"></script>
+  <script src="app.js?v=38"></script>
 </body>
 </html>
