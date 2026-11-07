@@ -1469,15 +1469,67 @@ function setReportPeriod(period) {
   currentReportPeriod = period;
   document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
 
-  if (period === 'all') document.getElementById('btnPeriodAll').classList.add('active');
-  if (period === 'month') document.getElementById('btnPeriodMonth').classList.add('active');
-  if (period === 'week') document.getElementById('btnPeriodWeek').classList.add('active');
+  const customBox = document.getElementById('customDateRangeBox');
+  if (customBox) {
+    if (period === 'custom') {
+      customBox.classList.remove('hidden');
+      const startInput = document.getElementById('reportStartDate');
+      const endInput = document.getElementById('reportEndDate');
+      const todayKey = getTodayDateKey();
+      if (!endInput.value) endInput.value = todayKey;
+      if (!startInput.value) {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        startInput.value = `${y}-${m}-${day}`;
+      }
+    } else {
+      customBox.classList.add('hidden');
+    }
+  }
+
+  const btnMap = {
+    all: 'btnPeriodAll',
+    month: 'btnPeriodMonth',
+    week: 'btnPeriodWeek',
+    today: 'btnPeriodToday',
+    yesterday: 'btnPeriodYesterday',
+    custom: 'btnPeriodCustom'
+  };
+  const activeBtn = document.getElementById(btnMap[period]);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const todayKey = getTodayDateKey();
+  const yDate = new Date();
+  yDate.setDate(yDate.getDate() - 1);
+  const yesterdayKey = `${yDate.getFullYear()}-${String(yDate.getMonth() + 1).padStart(2, '0')}-${String(yDate.getDate()).padStart(2, '0')}`;
 
   const descEl = document.getElementById('reportPeriodDesc');
-  if (period === 'all') descEl.textContent = 'Показатели за всё время ведения системы';
-  if (period === 'month') descEl.textContent = 'Показатели за текущий календарный месяц';
-  if (period === 'week') descEl.textContent = 'Показатели за последние 7 дней';
+  if (descEl) {
+    if (period === 'all') descEl.textContent = 'Показатели за всё время ведения системы';
+    if (period === 'month') descEl.textContent = 'Показатели за текущий календарный месяц';
+    if (period === 'week') descEl.textContent = 'Показатели за последние 7 дней';
+    if (period === 'today') descEl.textContent = `Показатели за сегодня (${todayKey})`;
+    if (period === 'yesterday') descEl.textContent = `Показатели за вчерашний день (${yesterdayKey})`;
+    if (period === 'custom') {
+      const s = document.getElementById('reportStartDate') ? document.getElementById('reportStartDate').value : '';
+      const e = document.getElementById('reportEndDate') ? document.getElementById('reportEndDate').value : '';
+      descEl.textContent = (s && e) ? `Показатели за период: с ${s} по ${e}` : 'Выберите диапазон дат в календаре выше';
+    }
+  }
 
+  renderReport();
+}
+
+function onCustomDateRangeChanged() {
+  const s = document.getElementById('reportStartDate') ? document.getElementById('reportStartDate').value : '';
+  const e = document.getElementById('reportEndDate') ? document.getElementById('reportEndDate').value : '';
+  const descEl = document.getElementById('reportPeriodDesc');
+  if (descEl && s && e) {
+    descEl.textContent = `Показатели за период: с ${s} по ${e}`;
+  }
   renderReport();
 }
 
@@ -1499,17 +1551,35 @@ function renderReport() {
   const catStats = {};
   categories.forEach(c => { catStats[c.id] = { count: 0, name: c.name, emoji: c.emoji, color: c.color }; });
 
+  const todayKey = getTodayDateKey();
+  const yDate = new Date();
+  yDate.setDate(yDate.getDate() - 1);
+  const yesterdayKey = `${yDate.getFullYear()}-${String(yDate.getMonth() + 1).padStart(2, '0')}-${String(yDate.getDate()).padStart(2, '0')}`;
+
+  const customStart = document.getElementById('reportStartDate') ? document.getElementById('reportStartDate').value : '';
+  const customEnd = document.getElementById('reportEndDate') ? document.getElementById('reportEndDate').value : '';
+
   // Filter dates
   const allDates = Object.keys(completions);
   Object.keys(workoutLogs).forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
+  if (!allDates.includes(todayKey)) allDates.push(todayKey);
+  if (!allDates.includes(yesterdayKey)) allDates.push(yesterdayKey);
 
   allDates.forEach(dateStr => {
     const d = new Date(dateStr);
     const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
 
-    if (currentReportPeriod === 'week' && diffDays > 7) return;
-    if (currentReportPeriod === 'month') {
+    if (currentReportPeriod === 'today') {
+      if (dateStr !== todayKey) return;
+    } else if (currentReportPeriod === 'yesterday') {
+      if (dateStr !== yesterdayKey) return;
+    } else if (currentReportPeriod === 'week') {
+      if (diffDays > 7) return;
+    } else if (currentReportPeriod === 'month') {
       if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) return;
+    } else if (currentReportPeriod === 'custom') {
+      if (customStart && dateStr < customStart) return;
+      if (customEnd && dateStr > customEnd) return;
     }
 
     // Schedule blocks completed
