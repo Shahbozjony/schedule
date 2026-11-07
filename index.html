@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=15">
+  <link rel="stylesheet" href="style.css?v=16">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -80,6 +80,86 @@
           <!-- Timeline List -->
           <div class="timeline-list" id="timelineList">
             <!-- Rendered by JS -->
+          </div>
+        </section>
+
+        <!-- TAB: STUDY & READING / УЧЁБА И ЧТЕНИЕ (ACCA, Чтение книг) -->
+        <section id="viewStudy" class="app-view hidden">
+          <!-- Streak & Target Banner -->
+          <div class="stats-grid three-col">
+            <div class="stat-card streak-card">
+              <div class="stat-icon">🔥</div>
+              <div class="stat-val" id="studyStreakCount">0</div>
+              <div class="stat-lbl">Дней стрик</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎯</div>
+              <div class="stat-val text-green" id="studyActivitiesDone">0/2</div>
+              <div class="stat-lbl">Предметов</div>
+            </div>
+            <div class="stat-card" style="border-color: rgba(99, 102, 241, 0.3);">
+              <div class="stat-icon">📚</div>
+              <div class="stat-val" id="studyTotalDoneToday">0</div>
+              <div class="stat-lbl">Стр. / Задач</div>
+            </div>
+          </div>
+
+          <!-- Daily Study Verdict Box -->
+          <div class="day-verdict-box" id="studyVerdictBox">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Study Program Header with Add Button -->
+          <div class="schedule-actions-row">
+            <span class="section-title">Программа учёбы и чтения</span>
+            <button class="add-slot-btn" onclick="openAddStudyModal()">+ Предмет / Чтение</button>
+          </div>
+
+          <!-- Day of Week Selector Bar -->
+          <div class="day-filter-bar">
+            <button class="day-filter-btn active" id="studyFilterDay_today" onclick="setStudyDayFilter('today')">⭐ На сегодня</button>
+            <button class="day-filter-btn" id="studyFilterDay_mon" onclick="setStudyDayFilter('mon')">Пн</button>
+            <button class="day-filter-btn" id="studyFilterDay_tue" onclick="setStudyDayFilter('tue')">Вт</button>
+            <button class="day-filter-btn" id="studyFilterDay_wed" onclick="setStudyDayFilter('wed')">Ср</button>
+            <button class="day-filter-btn" id="studyFilterDay_thu" onclick="setStudyDayFilter('thu')">Чт</button>
+            <button class="day-filter-btn" id="studyFilterDay_fri" onclick="setStudyDayFilter('fri')">Пт</button>
+            <button class="day-filter-btn" id="studyFilterDay_sat" onclick="setStudyDayFilter('sat')">Сб</button>
+            <button class="day-filter-btn" id="studyFilterDay_sun" onclick="setStudyDayFilter('sun')">Вс</button>
+            <button class="day-filter-btn" id="studyFilterDay_all" onclick="setStudyDayFilter('all')">Все</button>
+          </div>
+
+          <!-- Study Dynamic Container -->
+          <div class="exercises-container" id="studyActivitiesContainer">
+            <!-- Rendered dynamically by JS: ACCA, Reading, etc. -->
+          </div>
+
+          <!-- Finish All Button -->
+          <button class="primary-btn complete-workout-big-btn" style="background: linear-gradient(135deg, #4f46e5, #06b6d4);" onclick="completeFullStudyToday()">
+            🎓 Завершить всю программу учёбы дня!
+          </button>
+
+          <!-- SCHEDULE-DRIVEN STUDY PLAN vs FACT COMPARISON -->
+          <div class="section-card schedule-workout-card" id="scheduleStudyCard">
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 10px;">
+              <div>
+                <span class="section-title">⚡ Учёба за сегодня по расписанию</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">
+                  План из блоков категории «Работа / Учёба». Укажи факт по сессиям и задачам:
+                </p>
+              </div>
+              <button class="add-slot-btn" onclick="switchView('viewSchedule')">В расписание 📋</button>
+            </div>
+            <div id="scheduleStudyComparisonList">
+              <!-- Rendered dynamically by JS -->
+            </div>
+          </div>
+
+          <!-- Recent Study History -->
+          <div class="section-card history-card">
+            <h3>История учёбы и чтения за 7 дней</h3>
+            <div class="history-list" id="studyHistoryList">
+              <!-- Rendered by JS -->
+            </div>
           </div>
         </section>
 
@@ -294,6 +374,20 @@
             </div>
           </div>
 
+          <!-- Report Section: Study Today by Schedule -->
+          <div class="section-card" style="margin-top: 14px;">
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 10px;">
+              <div>
+                <span class="section-title">📚 Учёба и чтение за сегодня по расписанию</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;" id="studyTodaySubtitle">План берется из блоков категории «Работа / Учёба»</p>
+              </div>
+              <button class="add-slot-btn" onclick="switchView('viewStudy')">К учёбе 📚</button>
+            </div>
+            <div id="todayStudyReportList">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
           <!-- Report Section 3: Exercises Volume for Period -->
           <div class="section-card">
             <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">Объем упражнений за выбранный период</h3>
@@ -310,6 +404,10 @@
         <button class="nav-tab-item active" onclick="switchView('viewSchedule')">
           <span class="tab-icon">📋</span>
           <span class="tab-label">Расписание</span>
+        </button>
+        <button class="nav-tab-item" onclick="switchView('viewStudy')">
+          <span class="tab-icon">📚</span>
+          <span class="tab-label">Учёба</span>
         </button>
         <button class="nav-tab-item" onclick="switchView('viewPushups')">
           <span class="tab-icon">💪</span>
@@ -597,8 +695,119 @@
       </div>
     </div>
 
+    <!-- MODAL: ADD CUSTOM STUDY ACTIVITY -->
+    <div id="studyModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3>Новый предмет или чтение</h3>
+        <p class="modal-sub">Добавь предмет (ACCA, Чтение, Языки, Курсы и др.)</p>
+        <form id="studyForm" onsubmit="saveCustomStudyActivity(event)">
+          <div class="input-group">
+            <label>Название предмета / книги</label>
+            <input type="text" id="newStudyName" placeholder="Например: ACCA: Financial Reporting" required>
+          </div>
+          <div class="input-row-2">
+            <div class="input-group">
+              <label>Иконка</label>
+              <select id="newStudyIcon">
+                <option value="📑">📑 ACCA / Задачи</option>
+                <option value="📖">📖 Книга / Чтение</option>
+                <option value="📚">📚 Учебник / Теория</option>
+                <option value="⏱️">⏱️ Помодоро / Сессии</option>
+                <option value="🧠">🧠 Практика / Тесты</option>
+                <option value="💼">💼 Проект / Кейсы</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Единица измерения</label>
+              <select id="newStudyUnit">
+                <option value="задач">задач</option>
+                <option value="стр">стр (страницы)</option>
+                <option value="мин">мин (минуты)</option>
+                <option value="сессий">сессий (блоки)</option>
+                <option value="глав">глав</option>
+              </select>
+            </div>
+          </div>
+          <div class="input-group">
+            <label>Тип учета</label>
+            <select id="newStudyType">
+              <option value="reps">📊 Суммарный объем (задачи, страницы, минуты)</option>
+              <option value="sets">⏱️ По учебным блокам / сессиям</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label id="newStudyTargetLabel">Целевой объем в день</label>
+            <input type="number" id="newStudyTarget" value="20" min="1" max="5000" required>
+          </div>
+          <div class="input-group">
+            <label>Дни изучения в неделю</label>
+            <div class="days-select-grid" id="newStudyDaysGrid">
+              <label class="day-checkbox-label"><input type="checkbox" value="mon" checked> Пн</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="tue" checked> Вт</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="wed" checked> Ср</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="thu" checked> Чт</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="fri" checked> Пт</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="sat" checked> Сб</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="sun" checked> Вс</label>
+            </div>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeStudyModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Добавить 📚</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: CHANGE TARGET STUDY -->
+    <div id="studyTargetModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3>Изменить цель</h3>
+        <p class="modal-sub">Повышай или регулируй дневную норму учёбы!</p>
+        <form onsubmit="saveNewStudyTarget(event)">
+          <input type="hidden" id="editStudyActivityId">
+          <div class="input-group">
+            <label id="studyTargetModalLabel">Цель на день</label>
+            <input type="number" id="newStudyTargetInput" min="1" max="5000" required>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeStudyTargetModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: ADD STUDY SET / SESSION -->
+    <div id="studySetModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 id="studySetModalTitle">Записать учебную сессию</h3>
+        <p class="modal-sub">Укажи время и решённые задачи / страницы</p>
+        <form onsubmit="saveStudySet(event)">
+          <input type="hidden" id="studySetActivityId">
+          <div class="input-row-2">
+            <div class="input-group">
+              <label>Время (мин)</label>
+              <input type="number" id="studySetDurationInput" placeholder="45" value="45" required>
+            </div>
+            <div class="input-group">
+              <label>Объем (задач / стр)</label>
+              <input type="number" id="studySetVolumeInput" placeholder="10" value="10" required>
+            </div>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeStudySetModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Записать сессию ⏱️</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>
