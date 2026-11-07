@@ -1,11 +1,14 @@
-const CACHE_NAME = 'discipline-os-v26';
+const CACHE_NAME = 'discipline-os-v27';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=26',
-  './app.js?v=26',
+  './style.css?v=27',
+  './app.js?v=27',
   './manifest.json',
-  './favicon.svg'
+  './favicon.svg?v=27',
+  './apple-touch-icon.png?v=27',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
