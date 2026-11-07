@@ -13,6 +13,60 @@ let currentUser = null;
 let selectedPenaltyDate = new Date(); // Tracks viewing month in penalty tab
 let currentReportPeriod = 'all'; // 'all' | 'month' | 'week'
 let lastNotifiedMinute = ''; // Prevents duplicate TG notifications in the same minute
+let currentWorkoutDayFilter = 'today';
+
+// Week days definition
+const WEEK_DAYS = [
+  { code: 'mon', label: 'Пн' },
+  { code: 'tue', label: 'Вт' },
+  { code: 'wed', label: 'Ср' },
+  { code: 'thu', label: 'Чт' },
+  { code: 'fri', label: 'Пт' },
+  { code: 'sat', label: 'Сб' },
+  { code: 'sun', label: 'Вс' }
+];
+
+// Default categories
+const DEFAULT_CATEGORIES = [
+  { id: 'routine', name: 'Утро / Рутина', emoji: '🌅', color: '#38bdf8' },
+  { id: 'work', name: 'Работа / Учеба', emoji: '💼', color: '#818cf8' },
+  { id: 'sport', name: 'Спорт / Тренировка', emoji: '🥊', color: '#f43f5e' },
+  { id: 'rest', name: 'Отдых / Обед', emoji: '🧘', color: '#34d399' },
+  { id: 'sleep', name: 'Сон / Отбой', emoji: '🌙', color: '#a78bfa' }
+];
+
+// Default strict schedule
+const DEFAULT_SCHEDULE_SLOTS = [
+  { id: 's1', name: '🌅 Подъем, вода, зарядка', start: '06:30', end: '07:15', category: 'routine', penalty: 2000, exercises: [] },
+  { 
+    id: 's2', 
+    name: '💪 Тренировка и норма отжиманий', 
+    start: '07:15', 
+    end: '08:00', 
+    category: 'sport', 
+    penalty: 5000, 
+    exercises: [
+      { name: 'Отжимания от пола', sets: 4, target: 25, unit: 'раз' },
+      { name: 'Планка', sets: 3, target: 60, unit: 'сек' }
+    ] 
+  },
+  { id: 's3', name: '🍳 Питательный завтрак и душ', start: '08:00', end: '08:45', category: 'routine', penalty: 2000, exercises: [] },
+  { id: 's4', name: '🎯 Глубокая работа / Учеба (Блок 1)', start: '09:00', end: '13:00', category: 'work', penalty: 10000, exercises: [] },
+  { id: 's5', name: '🥗 Обед и перезагрузка', start: '13:00', end: '14:00', category: 'rest', penalty: 2000, exercises: [] },
+  { id: 's6', name: '💼 Работа, задачи и проекты (Блок 2)', start: '14:00', end: '18:00', category: 'work', penalty: 10000, exercises: [] },
+  { id: 's7', name: '🚶 Прогулка, разгрузка, свежий воздух', start: '18:00', end: '19:00', category: 'rest', penalty: 3000, exercises: [] },
+  { id: 's8', name: '🍽️ Ужин и время с семьей', start: '19:00', end: '20:30', category: 'routine', penalty: 3000, exercises: [] },
+  { id: 's9', name: '📚 Чтение книги и итоги дня', start: '20:30', end: '22:00', category: 'work', penalty: 5000, exercises: [] },
+  { id: 's10', name: '🌙 Подготовка ко сну, без гаджетов', start: '22:30', end: '23:00', category: 'sleep', penalty: 5000, exercises: [] }
+];
+
+// Default exercises
+const DEFAULT_EXERCISES = [
+  { id: 'ex_pushups', name: 'Отжимания от пола', icon: '💥', type: 'reps', target: 50, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
+  { id: 'ex_bench', name: 'Жим штанги лежа', icon: '🏋️', type: 'sets', target: 4, days: ['mon', 'wed', 'fri'] },
+  { id: 'ex_triceps', name: 'Гантели на трицепс', icon: '💪', type: 'sets', target: 3, days: ['mon', 'wed', 'fri'] },
+  { id: 'ex_plank', name: 'Планка на предплечьях', icon: '⏱️', type: 'reps', target: 120, days: ['tue', 'thu', 'sat'] }
+];
 
 // Initialize application on page load (Прямой вход без пароля!)
 document.addEventListener('DOMContentLoaded', () => {
@@ -594,25 +648,6 @@ function deleteCurrentSlot() {
    WORKOUT TAB LOGIC (Multi-exercise Tracker & Day Splits)
    ========================================================= */
 
-const WEEK_DAYS = [
-  { code: 'mon', label: 'Пн' },
-  { code: 'tue', label: 'Вт' },
-  { code: 'wed', label: 'Ср' },
-  { code: 'thu', label: 'Чт' },
-  { code: 'fri', label: 'Пт' },
-  { code: 'sat', label: 'Сб' },
-  { code: 'sun', label: 'Вс' }
-];
-
-let currentWorkoutDayFilter = 'today';
-
-const DEFAULT_EXERCISES = [
-  { id: 'ex_pushups', name: 'Отжимания от пола', icon: '💥', type: 'reps', target: 50, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
-  { id: 'ex_bench', name: 'Жим штанги лежа', icon: '🏋️', type: 'sets', target: 4, days: ['mon', 'wed', 'fri'] },
-  { id: 'ex_triceps', name: 'Гантели на трицепс', icon: '💪', type: 'sets', target: 3, days: ['mon', 'wed', 'fri'] },
-  { id: 'ex_plank', name: 'Планка на предплечьях', icon: '⏱️', type: 'reps', target: 120, days: ['tue', 'thu', 'sat'] }
-];
-
 function initUserExercises() {
   if (!currentUser) return;
   if (!currentUser.exercises || currentUser.exercises.length === 0) {
@@ -862,81 +897,6 @@ function renderPushups() {
         <div>⚠️ ТРЕНИРОВКА В ПРОЦЕССЕ (${completedCount}/${visibleExercises.length})</div>
         <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
           Закрой упражнения плана до полуночи, иначе штраф составит <b>5 000 сум</b>!
-        </div>
-      `;
-    }
-  }
-
-  saveCurrentUser();
-  renderWorkoutHistory();
-}
-          </button>
-        </div>
-      `;
-    }
-
-    card.innerHTML = `
-      <div class="ex-header">
-        <div class="ex-title-wrap">
-          <div class="ex-icon">${ex.icon || '🏋️'}</div>
-          <div>
-            <div class="ex-name">${escapeHtml(ex.name)}</div>
-            <div class="ex-meta">${ex.type === 'sets' ? `Цель: ${ex.target} подх.` : `Цель: ${ex.target} повт./сек`}</div>
-          </div>
-        </div>
-        <div class="ex-actions-top">
-          <button class="ex-btn-icon" title="Изменить цель" onclick="openChangeTargetModalEx('${ex.id}', ${ex.target}, '${ex.type}')">✏️</button>
-          <button class="ex-btn-icon" title="Удалить упражнение" onclick="deleteExercise('${ex.id}')">🗑️</button>
-        </div>
-      </div>
-      ${bodyHtml}
-    `;
-
-    container.appendChild(card);
-  });
-
-  const streakEl = document.getElementById('streakCount');
-  if (streakEl) streakEl.textContent = currentUser.streak || 0;
-
-  const exDoneEl = document.getElementById('workoutExercisesDone');
-  if (exDoneEl) exDoneEl.textContent = `${completedCount}/${exercises.length}`;
-
-  const penaltyStat = document.getElementById('todayPenaltyStatus');
-  const verdictBox = document.getElementById('dayVerdictBox');
-
-  const isAllDone = exercises.length > 0 && completedCount === exercises.length;
-
-  if (isAllDone || todayLog.status === 'success') {
-    todayLog.status = 'success';
-    todayLog.penalty = 0;
-    if (penaltyStat) {
-      penaltyStat.textContent = '0 сум';
-      penaltyStat.style.color = 'var(--accent-green)';
-    }
-
-    if (verdictBox) {
-      verdictBox.className = 'day-verdict-box verdict-success';
-      verdictBox.innerHTML = `
-        <div>🎯 ТРЕНИРОВКА ДНЯ ВЫПОЛНЕНА! Красавчик!</div>
-        <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
-          Штраф за сегодня: 0 сум. Серия побед продолжается!
-        </div>
-      `;
-    }
-  } else {
-    todayLog.status = 'pending';
-    todayLog.penalty = 5000;
-    if (penaltyStat) {
-      penaltyStat.textContent = '5 000 сум';
-      penaltyStat.style.color = 'var(--accent-red)';
-    }
-
-    if (verdictBox) {
-      verdictBox.className = 'day-verdict-box verdict-penalty';
-      verdictBox.innerHTML = `
-        <div>⚠️ ТРЕНИРОВКА В ПРОЦЕССЕ (${completedCount}/${exercises.length})</div>
-        <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
-          Закрой все упражнения до полуночи, иначе штраф составит <b>5 000 сум</b>!
         </div>
       `;
     }
