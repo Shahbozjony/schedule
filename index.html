@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -107,6 +107,22 @@
           <!-- Daily Study Verdict Box -->
           <div class="day-verdict-box" id="studyVerdictBox">
             <!-- Rendered by JS -->
+          </div>
+
+          <!-- BOOK TRACKER / КНИЖНАЯ ПОЛКА И ПРОГРЕСС СТРАНИЦ -->
+          <div class="section-card book-section-card" id="bookTrackerSection" style="margin-top: 10px;">
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 8px;">
+              <div>
+                <span class="section-title">📖 Мои книги и страницы</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">
+                  Укажи сколько страниц в книге и дневную цель. Прогресс считается сам:
+                </p>
+              </div>
+              <button class="add-slot-btn" onclick="openAddBookModal()">+ Добавить книгу 📖</button>
+            </div>
+            <div id="booksListContainer">
+              <!-- Rendered dynamically by JS -->
+            </div>
           </div>
 
           <!-- Study Program Header with Add Button -->
@@ -806,8 +822,46 @@
       </div>
     </div>
 
+    <!-- MODAL: ADD / EDIT BOOK -->
+    <div id="bookModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 id="bookModalTitle">Добавить книгу в трекер</h3>
+        <p class="modal-sub">Укажи объем и сколько страниц читать каждый день</p>
+        <form id="bookForm" onsubmit="saveBookForm(event)">
+          <input type="hidden" id="editBookId">
+          <div class="input-group">
+            <label>Название книги / учебника</label>
+            <input type="text" id="bookTitleInput" placeholder="Например: Атомные привычки или ACCA Study Text" required>
+          </div>
+          <div class="input-group">
+            <label>Автор / Издательство (опционально)</label>
+            <input type="text" id="bookAuthorInput" placeholder="Например: Джеймс Клир или BPP / Kaplan">
+          </div>
+          <div class="input-row-2">
+            <div class="input-group">
+              <label>Всего страниц в книге</label>
+              <input type="number" id="bookTotalPagesInput" min="1" max="10000" placeholder="350" required>
+            </div>
+            <div class="input-group">
+              <label>Норма в день (стр./день)</label>
+              <input type="number" id="bookDailyTargetInput" min="1" max="1000" value="25" required>
+            </div>
+          </div>
+          <div class="input-group">
+            <label>Текущая страница (где ты сейчас)</label>
+            <input type="number" id="bookCurrentPageInput" min="0" max="10000" value="0" placeholder="0">
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="cancel-btn" onclick="closeBookModal()">Отмена</button>
+            <button type="submit" class="primary-btn">Сохранить книгу 📖</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
