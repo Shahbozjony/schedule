@@ -78,6 +78,28 @@ const DEFAULT_STUDY_ACTIVITIES = [
   { id: 'study_acca_sessions', name: 'ACCA: Учебные сессии (помодоро)', icon: '⏱️', type: 'sets', unit: 'сессий', target: 4, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] }
 ];
 
+// Default books for reading tracker
+const DEFAULT_BOOKS = [
+  {
+    id: 'book_acca',
+    title: 'ACCA Study Text (Financial Reporting)',
+    author: 'BPP / Kaplan',
+    totalPages: 480,
+    currentPage: 60,
+    dailyTarget: 20,
+    status: 'reading'
+  },
+  {
+    id: 'book_habits',
+    title: 'Атомные привычки',
+    author: 'Джеймс Клир',
+    totalPages: 320,
+    currentPage: 85,
+    dailyTarget: 25,
+    status: 'reading'
+  }
+];
+
 // Initialize application on page load (Прямой вход без пароля!)
 document.addEventListener('DOMContentLoaded', () => {
   initLiveClock();
@@ -220,6 +242,16 @@ function ensureUserDefaults() {
       ];
     }
   }
+
+  // Ensure books for reading tracker
+  if (!currentUser.books || currentUser.books.length === 0) {
+    currentUser.books = JSON.parse(JSON.stringify(DEFAULT_BOOKS));
+  }
+  currentUser.books.forEach(b => {
+    if (b.currentPage === undefined) b.currentPage = 0;
+    if (b.dailyTarget === undefined) b.dailyTarget = 25;
+    if (!b.status) b.status = 'reading';
+  });
 
   initUserExercises();
   initUserStudyActivities();
@@ -2483,8 +2515,230 @@ function renderStudy() {
   }
 
   saveCurrentUser();
+  renderBooks();
   renderStudyHistory();
   renderScheduleStudyComparison();
+}
+
+/* =========================================================
+   BOOK TRACKER FUNCTIONS
+   ========================================================= */
+
+function renderBooks() {
+  const container = document.getElementById('booksListContainer');
+  if (!container || !currentUser) return;
+  container.innerHTML = '';
+
+  const books = currentUser.books || [];
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = { status: 'pending', activities: {}, scheduleDone: {}, scheduleSets: {}, bookPages: {} };
+  }
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.bookPages) todayLog.bookPages = {};
+
+  if (books.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">
+        Книг в трекере пока нет. Нажмите «+ Добавить книгу», чтобы начать учет страниц!
+      </div>
+    `;
+    return;
+  }
+
+  books.forEach(book => {
+    const totalPages = Math.max(1, parseInt(book.totalPages, 10) || 100);
+    const currentPage = Math.min(totalPages, Math.max(0, parseInt(book.currentPage, 10) || 0));
+    const dailyTarget = Math.max(1, parseInt(book.dailyTarget, 10) || 20);
+    const percent = Math.min(100, Math.round((currentPage / totalPages) * 100));
+    const remainingPages = Math.max(0, totalPages - currentPage);
+    const daysLeft = Math.ceil(remainingPages / dailyTarget);
+    const isCompleted = currentPage >= totalPages;
+
+    const todayReadForBook = todayLog.bookPages[book.id] || 0;
+
+    const card = document.createElement('div');
+    card.className = `book-card ${isCompleted ? 'completed' : ''}`;
+    card.id = `book-card-${book.id}`;
+    card.innerHTML = `
+      <div class="book-card-top">
+        <div class="book-info">
+          <div class="book-title-row">
+            <span class="book-icon">📖</span>
+            <span class="book-title-text">${escapeHtml(book.title)}</span>
+            ${isCompleted ? '<span class="diff-badge diff-exact" style="margin-left: 6px;">✓ Прочитана! 🏆</span>' : ''}
+          </div>
+          ${book.author ? `<div class="book-author">${escapeHtml(book.author)}</div>` : ''}
+        </div>
+        <div class="ex-actions-top">
+          <button class="ex-btn-icon" title="Редактировать книгу / страницу" onclick="openEditBookModal('${book.id}')">✏️</button>
+          <button class="ex-btn-icon" title="Удалить книгу" onclick="deleteBook('${book.id}')">🗑️</button>
+        </div>
+      </div>
+
+      <div class="book-progress-box">
+        <div class="book-progress-header">
+          <span class="book-pages-counter">
+            Страница <b>${currentPage}</b> из <b>${totalPages}</b>
+          </span>
+          <span class="book-pct-badge">${percent}%</span>
+        </div>
+        <div class="today-rep-bar-bg" style="margin: 6px 0 8px 0;">
+          <div class="today-rep-bar-fill" style="width: ${percent}%; background: ${isCompleted ? 'var(--accent-green)' : 'linear-gradient(90deg, #10b981, #06b6d4)'};"></div>
+        </div>
+        <div class="book-sub-stats">
+          <span>Цель: <b>${dailyTarget} стр./день</b></span>
+          <span>${isCompleted ? '🎉 Все страницы прочитаны!' : `Осталось: <b>${remainingPages} стр.</b> (~${daysLeft} дн.)`}</span>
+        </div>
+      </div>
+
+      <div class="book-logging-row">
+        <div class="book-log-label">Прочитано сегодня:</div>
+        <div class="sched-comp-fact-wrap">
+          <button type="button" class="sched-set-step-btn" title="Уменьшить" onclick="stepBookTodayPages('${book.id}', -5)">−</button>
+          <input type="number" 
+                 class="sched-set-input" 
+                 style="width: 55px;" 
+                 value="${todayReadForBook}" 
+                 min="0" 
+                 onfocus="this.select()"
+                 onchange="setBookTodayPages('${book.id}', this.value)">
+          <button type="button" class="sched-set-step-btn" title="Увеличить" onclick="stepBookTodayPages('${book.id}', 5)">+</button>
+          <button type="button" class="sched-set-target-btn" title="Выполнить дневную норму (${dailyTarget} стр.)" onclick="setBookTodayPages('${book.id}', ${dailyTarget})">=${dailyTarget}</button>
+          <span style="font-size: 12px; font-weight: 700; color: var(--text-dim); margin-left: 2px;">стр.</span>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function openAddBookModal() {
+  document.getElementById('editBookId').value = '';
+  document.getElementById('bookModalTitle').textContent = 'Добавить книгу в трекер';
+  document.getElementById('bookForm').reset();
+  document.getElementById('bookDailyTargetInput').value = 25;
+  document.getElementById('bookCurrentPageInput').value = 0;
+  document.getElementById('bookModal').classList.remove('hidden');
+}
+
+function openEditBookModal(bookId) {
+  const book = (currentUser.books || []).find(b => b.id === bookId);
+  if (!book) return;
+  document.getElementById('editBookId').value = book.id;
+  document.getElementById('bookModalTitle').textContent = 'Редактировать книгу';
+  document.getElementById('bookTitleInput').value = book.title;
+  document.getElementById('bookAuthorInput').value = book.author || '';
+  document.getElementById('bookTotalPagesInput').value = book.totalPages;
+  document.getElementById('bookDailyTargetInput').value = book.dailyTarget;
+  document.getElementById('bookCurrentPageInput').value = book.currentPage;
+  document.getElementById('bookModal').classList.remove('hidden');
+}
+
+function closeBookModal() {
+  document.getElementById('bookModal').classList.add('hidden');
+}
+
+function saveBookForm(e) {
+  e.preventDefault();
+  const id = document.getElementById('editBookId').value;
+  const title = document.getElementById('bookTitleInput').value.trim();
+  const author = document.getElementById('bookAuthorInput').value.trim();
+  const totalPages = parseInt(document.getElementById('bookTotalPagesInput').value, 10) || 100;
+  const dailyTarget = parseInt(document.getElementById('bookDailyTargetInput').value, 10) || 25;
+  const currentPage = Math.min(totalPages, Math.max(0, parseInt(document.getElementById('bookCurrentPageInput').value, 10) || 0));
+
+  if (!title) return;
+
+  if (!currentUser.books) currentUser.books = [];
+
+  if (id) {
+    const existing = currentUser.books.find(b => b.id === id);
+    if (existing) {
+      existing.title = title;
+      existing.author = author;
+      existing.totalPages = totalPages;
+      existing.dailyTarget = dailyTarget;
+      existing.currentPage = currentPage;
+      existing.status = (currentPage >= totalPages) ? 'completed' : 'reading';
+    }
+  } else {
+    const newBook = {
+      id: 'book_' + Date.now(),
+      title,
+      author,
+      totalPages,
+      dailyTarget,
+      currentPage,
+      status: (currentPage >= totalPages) ? 'completed' : 'reading',
+      startedDate: getTodayDateKey()
+    };
+    currentUser.books.push(newBook);
+  }
+
+  saveCurrentUser();
+  closeBookModal();
+  renderBooks();
+  renderStudy();
+}
+
+function deleteBook(bookId) {
+  if (!currentUser || !currentUser.books) return;
+  if (confirm('Удалить эту книгу из трекера?')) {
+    currentUser.books = currentUser.books.filter(b => b.id !== bookId);
+    saveCurrentUser();
+    renderBooks();
+    renderStudy();
+  }
+}
+
+function setBookTodayPages(bookId, val) {
+  if (!currentUser) return;
+  const num = Math.max(0, parseInt(val, 10) || 0);
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = { status: 'pending', activities: {}, scheduleDone: {}, scheduleSets: {}, bookPages: {} };
+  }
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.bookPages) todayLog.bookPages = {};
+
+  const prevRead = todayLog.bookPages[bookId] || 0;
+  const diff = num - prevRead;
+  todayLog.bookPages[bookId] = num;
+
+  const book = (currentUser.books || []).find(b => b.id === bookId);
+  if (book) {
+    book.currentPage = Math.min(book.totalPages, Math.max(0, (book.currentPage || 0) + diff));
+    if (book.currentPage >= book.totalPages) {
+      book.status = 'completed';
+    } else {
+      book.status = 'reading';
+    }
+  }
+
+  // Sync with Reading activity in studyActivities
+  const readingAct = (currentUser.studyActivities || []).find(a => a.name.toLowerCase().includes('чтени') || a.unit === 'стр');
+  if (readingAct && todayLog.activities && todayLog.activities[readingAct.id]) {
+    todayLog.activities[readingAct.id].done = Math.max(0, (todayLog.activities[readingAct.id].done || 0) + diff);
+    if (todayLog.activities[readingAct.id].done >= readingAct.target) {
+      todayLog.activities[readingAct.id].completed = true;
+    }
+  }
+
+  saveCurrentUser();
+  renderBooks();
+  renderStudy();
+  renderReport();
+}
+
+function stepBookTodayPages(bookId, delta) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  const todayLog = (currentUser.studyLogs && currentUser.studyLogs[todayKey]) || {};
+  const cur = (todayLog.bookPages && todayLog.bookPages[bookId]) || 0;
+  setBookTodayPages(bookId, cur + delta);
 }
 
 function addVolumeToStudyActivity(actId, count) {
