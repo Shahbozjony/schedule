@@ -1,9 +1,9 @@
-const CACHE_NAME = 'discipline-os-v27';
+const CACHE_NAME = 'discipline-os-v28';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=27',
-  './app.js?v=27',
+  './style.css?v=28',
+  './app.js?v=28',
   './manifest.json',
   './favicon.svg?v=27',
   './apple-touch-icon.png?v=27',
