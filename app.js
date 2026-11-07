@@ -1043,6 +1043,7 @@ function renderPushups() {
 
   saveCurrentUser();
   renderWorkoutHistory();
+  renderScheduleWorkoutComparison();
 }
 
 function addRepsToExercise(exId, count) {
@@ -1629,11 +1630,8 @@ function renderReport() {
   document.getElementById('repTotalBlocksDone').textContent = totalBlocksDone;
   document.getElementById('repTotalPenalty').textContent = formatCurrencyUZS(totalPenalty);
 
-  // Render Section 1: Today's Workout Execution vs Plan
+  // Render Today's Schedule Workout Execution vs Plan
   renderTodayWorkoutReport();
-
-  // Render Section 2: Weekly Workout Days Matrix
-  renderWeekDaysScheduleMatrix();
 
   // Render Category Breakdown
   const catListEl = document.getElementById('categoriesReportList');
@@ -1690,142 +1688,245 @@ function renderReport() {
   }
 }
 
+function getScheduleSportExercises() {
+  if (!currentUser || !currentUser.scheduleSlots) return [];
+  const sportSlots = currentUser.scheduleSlots.filter(s => s.category === 'sport');
+  const result = [];
+  sportSlots.forEach(slot => {
+    const exs = slot.exercises || [];
+    exs.forEach(ex => {
+      const sets = parseInt(ex.sets, 10) || 1;
+      const target = parseInt(ex.target, 10) || 10;
+      const unit = ex.unit || 'раз';
+      const isRepsOrSec = unit === 'раз' || unit === 'сек' || unit === 'мин';
+      const totalPlan = isRepsOrSec ? (sets * target) : sets;
+
+      result.push({
+        slotId: slot.id,
+        slotName: slot.name,
+        slotTime: `${slot.start} - ${slot.end}`,
+        name: ex.name,
+        sets,
+        target,
+        unit,
+        totalPlan
+      });
+    });
+  });
+  return result;
+}
+
+function renderScheduleWorkoutComparison() {
+  const container = document.getElementById('scheduleWorkoutComparisonList');
+  if (!container || !currentUser) return;
+  container.innerHTML = '';
+
+  const sportExercises = getScheduleSportExercises();
+  const todayKey = getTodayDateKey();
+  if (!currentUser.workoutLogs[todayKey]) currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {} };
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+
+  if (sportExercises.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 20px 14px; text-align: center; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px dashed var(--border);">
+        <div style="font-size: 26px; margin-bottom: 6px;">📋</div>
+        <div style="font-size: 14px; font-weight: 700;">В расписании пока нет упражнений</div>
+        <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">
+          Откройте вкладку «Расписание», нажмите на блок тренировки (категория «Спорт») и добавьте упражнения с количеством подходов и повторений.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  sportExercises.forEach(item => {
+    const key = item.name;
+    let factDone = todayLog.scheduleDone[key];
+    if (factDone === undefined) {
+      const matchedEx = (currentUser.exercises || []).find(e => e.name.toLowerCase() === item.name.toLowerCase());
+      if (matchedEx && todayLog.exercises && todayLog.exercises[matchedEx.id]) {
+        const exData = todayLog.exercises[matchedEx.id];
+        factDone = matchedEx.type === 'sets' ? ((exData.sets && exData.sets.length) || 0) : (exData.done || 0);
+      } else {
+        factDone = 0;
+      }
+      todayLog.scheduleDone[key] = factDone;
+    }
+
+    const totalPlan = item.totalPlan;
+    const diff = factDone - totalPlan;
+    const isCompleted = factDone >= totalPlan;
+    const pct = totalPlan > 0 ? Math.round((factDone / totalPlan) * 100) : 0;
+
+    let diffBadgeHtml = '';
+    if (diff < 0) {
+      const remaining = Math.abs(diff);
+      diffBadgeHtml = `<span class="diff-badge diff-remaining">Осталось: ${remaining} ${item.unit} (${pct}%) ⏳</span>`;
+    } else if (diff === 0) {
+      diffBadgeHtml = `<span class="diff-badge diff-exact">✓ Выполнено в точности (100%) 🎯</span>`;
+    } else {
+      diffBadgeHtml = `<span class="diff-badge diff-over">Перевыполнено: +${diff} ${item.unit} (${pct}%) 🔥</span>`;
+    }
+
+    const stepAmount = (item.unit === 'подх.') ? 1 : (item.unit === 'сек' ? 10 : 10);
+
+    const card = document.createElement('div');
+    card.className = `schedule-comparison-item ${isCompleted ? 'completed' : ''}`;
+    card.innerHTML = `
+      <div class="sched-comp-top">
+        <div>
+          <div class="sched-comp-title">
+            <span>💪</span>
+            <span>${escapeHtml(item.name)}</span>
+          </div>
+          <div class="sched-comp-slot-tag">Блок расписания: ${escapeHtml(item.slotName)} (${item.slotTime})</div>
+        </div>
+        ${diffBadgeHtml}
+      </div>
+
+      <div class="sched-comp-grid">
+        <div class="sched-comp-col">
+          <span class="sched-comp-col-label">План из расписания</span>
+          <span class="sched-comp-plan-val">${item.sets} подх. × ${item.target} ${item.unit} <b>(= ${totalPlan} ${item.unit})</b></span>
+        </div>
+
+        <div class="sched-comp-col">
+          <span class="sched-comp-col-label">Факт (сделано)</span>
+          <div class="sched-comp-fact-wrap">
+            <button type="button" class="sched-fact-btn" onclick="stepScheduleExerciseDone('${escapeHtml(item.name)}', -${stepAmount})">−</button>
+            <input type="number" class="sched-fact-input" value="${factDone}" min="0" onchange="setScheduleExerciseDone('${escapeHtml(item.name)}', this.value)">
+            <button type="button" class="sched-fact-btn" onclick="stepScheduleExerciseDone('${escapeHtml(item.name)}', ${stepAmount})">+</button>
+            <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-left: 2px;">${item.unit}</span>
+          </div>
+        </div>
+
+        <div class="sched-comp-col">
+          <span class="sched-comp-col-label">Разница (Факт - План)</span>
+          <div style="font-size: 13px; font-weight: 800; color: ${diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)'}">
+            ${diff > 0 ? `+${diff}` : diff} ${item.unit}
+          </div>
+        </div>
+      </div>
+
+      <div class="today-rep-bar-bg" style="margin-top: 8px;">
+        <div class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background-color: ${isCompleted ? 'var(--accent-green)' : (factDone > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function setScheduleExerciseDone(exName, val) {
+  if (!currentUser) return;
+  const num = Math.max(0, parseInt(val, 10) || 0);
+  const todayKey = getTodayDateKey();
+  if (!currentUser.workoutLogs[todayKey]) currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {} };
+  if (!currentUser.workoutLogs[todayKey].scheduleDone) currentUser.workoutLogs[todayKey].scheduleDone = {};
+  currentUser.workoutLogs[todayKey].scheduleDone[exName] = num;
+
+  // Sync with matching exercise in currentUser.exercises
+  const matchedEx = (currentUser.exercises || []).find(e => e.name.toLowerCase() === exName.toLowerCase());
+  if (matchedEx) {
+    if (!currentUser.workoutLogs[todayKey].exercises[matchedEx.id]) {
+      currentUser.workoutLogs[todayKey].exercises[matchedEx.id] = (matchedEx.type === 'sets' ? { sets: [], completed: false } : { done: 0, completed: false });
+    }
+    const exData = currentUser.workoutLogs[todayKey].exercises[matchedEx.id];
+    if (matchedEx.type === 'sets') {
+      if (!exData.sets) exData.sets = [];
+      while (exData.sets.length < num) exData.sets.push({ weight: 60, reps: 10 });
+      if (exData.sets.length > num) exData.sets = exData.sets.slice(0, num);
+      if (num >= matchedEx.target) exData.completed = true;
+    } else {
+      exData.done = num;
+      if (num >= matchedEx.target) exData.completed = true;
+    }
+  }
+
+  saveCurrentUser();
+  renderPushups();
+  renderReport();
+}
+
+function stepScheduleExerciseDone(exName, delta) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  const todayLog = currentUser.workoutLogs[todayKey] || { exercises: {}, scheduleDone: {} };
+  const current = (todayLog.scheduleDone && todayLog.scheduleDone[exName]) || 0;
+  setScheduleExerciseDone(exName, current + delta);
+}
+
 function renderTodayWorkoutReport() {
   const container = document.getElementById('todayWorkoutReportList');
   if (!container || !currentUser) return;
   container.innerHTML = '';
 
-  const dayIndex = new Date().getDay();
-  const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const todayCode = dayMap[dayIndex];
   const todayKey = getTodayDateKey();
-  const todayLog = (currentUser.workoutLogs && currentUser.workoutLogs[todayKey]) || { exercises: {} };
+  const todayLog = (currentUser.workoutLogs && currentUser.workoutLogs[todayKey]) || { exercises: {}, scheduleDone: {} };
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
 
-  const exercises = currentUser.exercises || [];
+  const sportExercises = getScheduleSportExercises();
 
   const todaySub = document.getElementById('repTodaySubtitle');
   if (todaySub) {
-    todaySub.textContent = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+    todaySub.textContent = `План из расписания на ${new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}`;
   }
 
-  exercises.forEach(ex => {
-    const isScheduled = ex.days && ex.days.includes(todayCode);
-    const exData = (todayLog.exercises && todayLog.exercises[ex.id]) || { done: 0, sets: [] };
-    const isPlank = ex.id.includes('plank') || ex.name.toLowerCase().includes('планк');
+  if (sportExercises.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">
+        В блоках расписания категории «Спорт» на сегодня нет упражнений.
+      </div>
+    `;
+    return;
+  }
 
-    let done = 0;
-    let target = ex.target || 1;
-    let unit = isPlank ? 'сек' : (ex.type === 'sets' ? 'подх.' : 'раз');
-    let isDone = false;
-
-    if (ex.type === 'sets') {
-      const sets = exData.sets || [];
-      done = sets.length;
-      isDone = done >= target || exData.completed;
-    } else {
-      done = exData.done || 0;
-      isDone = done >= target || exData.completed;
+  sportExercises.forEach(item => {
+    let factDone = todayLog.scheduleDone[item.name];
+    if (factDone === undefined) {
+      const matchedEx = (currentUser.exercises || []).find(e => e.name.toLowerCase() === item.name.toLowerCase());
+      if (matchedEx && todayLog.exercises && todayLog.exercises[matchedEx.id]) {
+        const exData = todayLog.exercises[matchedEx.id];
+        factDone = matchedEx.type === 'sets' ? ((exData.sets && exData.sets.length) || 0) : (exData.done || 0);
+      } else {
+        factDone = 0;
+      }
     }
 
-    const pct = Math.min(100, Math.round((done / target) * 100));
+    const totalPlan = item.totalPlan;
+    const diff = factDone - totalPlan;
+    const isCompleted = factDone >= totalPlan;
+    const pct = totalPlan > 0 ? Math.round((factDone / totalPlan) * 100) : 0;
 
     let badgeHtml = '';
-    if (isScheduled) {
-      if (isDone) {
-        badgeHtml = `<span class="rep-badge done">✓ Выполнено (${done} / ${target} ${unit})</span>`;
-      } else if (done > 0) {
-        badgeHtml = `<span class="rep-badge in-progress">⏳ В процессе (${done} / ${target} ${unit})</span>`;
-      } else {
-        badgeHtml = `<span class="rep-badge pending">❌ Не сделано (План: ${target} ${unit})</span>`;
-      }
+    if (diff < 0) {
+      badgeHtml = `<span class="rep-badge in-progress">Осталось: ${Math.abs(diff)} ${item.unit} (${pct}%)</span>`;
+    } else if (diff === 0) {
+      badgeHtml = `<span class="rep-badge done">✓ Выполнено в точности (100%)</span>`;
     } else {
-      if (done > 0) {
-        badgeHtml = `<span class="rep-badge in-progress">🔥 Вне плана: ${done} ${unit}</span>`;
-      } else {
-        badgeHtml = `<span class="rep-badge rest">🌴 День отдыха</span>`;
-      }
+      badgeHtml = `<span class="rep-badge done">🔥 Перевыполнено (+${diff} ${item.unit})</span>`;
     }
 
-    const item = document.createElement('div');
-    item.className = `today-workout-report-item ${isDone && isScheduled ? 'done' : ''}`;
-    item.innerHTML = `
+    const row = document.createElement('div');
+    row.className = `today-workout-report-item ${isCompleted ? 'done' : ''}`;
+    row.innerHTML = `
       <div class="today-rep-top">
         <div class="today-rep-name">
-          <span>${ex.icon || '🏋️'}</span>
-          <span>${escapeHtml(ex.name)}</span>
+          <span>💪</span>
+          <span>${escapeHtml(item.name)}</span>
+          <span style="font-size: 11px; font-weight: 500; color: var(--text-dim);">(${escapeHtml(item.slotName)})</span>
         </div>
         ${badgeHtml}
       </div>
-      <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-top: 4px;">
-        <span>${isScheduled ? `По плану на сегодня (Цель: ${target} ${unit})` : 'Не запланировано на сегодня'}</span>
-        <span style="font-weight: 700; color: ${isDone ? 'var(--accent-green)' : 'var(--text-normal)'};">${pct}%</span>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px; flex-wrap: wrap; gap: 4px;">
+        <span style="color: #a5b4fc;">План: <b>${item.sets} подх. × ${item.target} ${item.unit} (${totalPlan} ${item.unit})</b></span>
+        <span>Факт: <b>${factDone} ${item.unit}</b> (Разница: <b style="color: ${diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)'}">${diff > 0 ? `+${diff}` : diff}</b>)</span>
       </div>
-      <div class="today-rep-bar-bg">
-        <div class="today-rep-bar-fill" style="width: ${pct}%; background-color: ${isDone ? 'var(--accent-green)' : (done > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
-      </div>
-    `;
-    container.appendChild(item);
-  });
-}
-
-function renderWeekDaysScheduleMatrix() {
-  const container = document.getElementById('weekDaysScheduleMatrix');
-  if (!container || !currentUser) return;
-  container.innerHTML = '';
-
-  const dayIndex = new Date().getDay();
-  const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const todayCode = dayMap[dayIndex];
-
-  const daysConfig = [
-    { code: 'mon', label: 'Понедельник' },
-    { code: 'tue', label: 'Вторник' },
-    { code: 'wed', label: 'Среда' },
-    { code: 'thu', label: 'Четверг' },
-    { code: 'fri', label: 'Пятница' },
-    { code: 'sat', label: 'Суббота' },
-    { code: 'sun', label: 'Воскресенье' }
-  ];
-
-  const exercises = currentUser.exercises || [];
-
-  daysConfig.forEach(d => {
-    const isToday = d.code === todayCode;
-    const dayExercises = exercises.filter(ex => ex.days && ex.days.includes(d.code));
-
-    const card = document.createElement('div');
-    card.className = `week-split-day-card ${isToday ? 'today' : ''}`;
-
-    let chipsHtml = '';
-    if (dayExercises.length > 0) {
-      chipsHtml = dayExercises.map(ex => {
-        const isPlank = ex.id.includes('plank') || ex.name.toLowerCase().includes('планк');
-        const unit = isPlank ? 'сек' : (ex.type === 'sets' ? 'подх.' : 'раз');
-        return `
-          <span class="week-split-ex-chip">
-            ${ex.icon || '🏋️'} <b>${escapeHtml(ex.name)}</b>: ${ex.target} ${unit}
-          </span>
-        `;
-      }).join('');
-    } else {
-      chipsHtml = `<span class="week-split-ex-chip empty">🌴 Полный отдых / Восстановление</span>`;
-    }
-
-    card.innerHTML = `
-      <div class="week-split-day-header">
-        <div class="week-split-day-title">
-          <span>📅 ${d.label}</span>
-          ${isToday ? '<span class="week-split-today-badge">СЕГОДНЯ</span>' : ''}
-        </div>
-        <span style="font-size: 11px; font-weight: 700; color: ${dayExercises.length > 0 ? 'var(--accent-primary)' : 'var(--text-dim)'};">
-          ${dayExercises.length} упр.
-        </span>
-      </div>
-      <div class="week-split-ex-list">
-        ${chipsHtml}
+      <div class="today-rep-bar-bg" style="margin-top: 6px;">
+        <div class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background-color: ${isCompleted ? 'var(--accent-green)' : (factDone > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
       </div>
     `;
-    container.appendChild(card);
+    container.appendChild(row);
   });
 }
 
