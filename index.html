@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="stylesheet" href="style.css?v=26">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -653,7 +653,7 @@
 
     <!-- MODAL: ADD/EDIT SCHEDULE BLOCK -->
     <div id="slotModal" class="modal-overlay hidden">
-      <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto;">
+      <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto; overflow-x: hidden;">
         <div class="modal-handle"></div>
         <h3 id="modalSlotTitle">Новый блок времени</h3>
         <form id="slotForm" onsubmit="saveScheduleSlot(event)">
@@ -694,12 +694,26 @@
           <!-- Block Exercises & Targets Section (Отжимания, Планка и др.) -->
           <div class="slot-exercises-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 13px; font-weight: 700; color: #a5b4fc;">Упражнения блока (подходы / планка)</span>
+              <span style="font-size: 13px; font-weight: 700; color: #a5b4fc;">Упражнения и нормативы</span>
               <div style="display: flex; gap: 6px;">
                 <button type="button" class="add-slot-btn" onclick="openExerciseModal()" style="padding: 4px 8px; font-size: 11px; background: rgba(99,102,241,0.2); border-color: #6366f1;">+ В базу</button>
                 <button type="button" class="add-slot-btn" onclick="addExerciseFieldToSlot()" style="padding: 4px 8px; font-size: 11px;">+ Добавить</button>
               </div>
             </div>
+
+            <!-- Column Headers: Clearly visible names for Exercise, Sets, Reps/Target, Units -->
+            <div class="slot-ex-header-row" id="slotExHeaderRow">
+              <span class="ex-hdr-name" title="Упражнение или предмет">Упражнение</span>
+              <span class="ex-hdr-sets" title="Количество подходов">Подходы</span>
+              <span class="ex-hdr-target" title="Целевое количество повторений, страниц или минут">Раз / Норма</span>
+              <span class="ex-hdr-unit" title="Единица измерения">Ед.</span>
+              <span class="ex-hdr-del"></span>
+            </div>
+
+            <div id="slotExEmptyHint" class="slot-ex-empty-hint hidden">
+              Нет привязанных нормативов. Нажмите «+ Добавить», чтобы указать подходы и норму.
+            </div>
+
             <div id="slotExercisesContainer" class="slot-ex-container">
               <!-- Dynamic rows of exercises for this block -->
             </div>
@@ -1101,6 +1115,6 @@
 
   </div>
 
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>
