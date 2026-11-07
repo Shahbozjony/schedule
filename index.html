@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=28">
+  <link rel="stylesheet" href="style.css?v=29">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -148,10 +148,17 @@
             </button>
           </div>
 
-          <!-- Schedule Controls -->
+          <!-- Schedule Controls with Date Navigator -->
           <div class="schedule-actions-row">
-            <span class="section-title">Все блоки дня</span>
-            <button class="add-slot-btn" onclick="openAddSlotModal()">+ Добавить блок</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="section-title" style="margin-bottom: 0;">Блоки</span>
+              <div class="schedule-date-nav">
+                <button type="button" class="date-nav-arrow" onclick="changeScheduleViewDate(-1)" title="Предыдущий день">◀</button>
+                <span class="schedule-nav-current" id="scheduleNavDateLabel" onclick="resetScheduleViewDateToToday()" title="Нажмите, чтобы вернуться к сегодняшнему дню">Сегодня</span>
+                <button type="button" class="date-nav-arrow" onclick="changeScheduleViewDate(1)" title="Следующий день">▶</button>
+              </div>
+            </div>
+            <button class="add-slot-btn" onclick="openAddSlotModal()">+ Добавить</button>
           </div>
 
           <!-- Timeline List -->
@@ -698,6 +705,37 @@
             <span style="font-size: 11px; color: var(--text-dim);">Укажите штраф в зависимости от важности дела</span>
           </div>
 
+          <!-- Recurrence / Day Selector (Каждый день, Только сегодня, Определённая дата, Дни недели) -->
+          <div class="input-group">
+            <label>Повторение и день блока</label>
+            <select id="slotRecurrenceType" onchange="onSlotRecurrenceTypeChange(this)">
+              <option value="daily">📅 Каждый день (постоянное расписание)</option>
+              <option value="today_only">🎯 Только на сегодня</option>
+              <option value="specific_date">🗓️ На определённую дату...</option>
+              <option value="weekdays">📆 По определённым дням недели...</option>
+            </select>
+          </div>
+
+          <!-- Specific Date Input -->
+          <div class="input-group hidden" id="slotSpecificDateGroup">
+            <label>Выберите дату выполнения блока</label>
+            <input type="date" id="slotSpecificDate">
+          </div>
+
+          <!-- Weekdays Checkboxes -->
+          <div class="input-group hidden" id="slotWeekdaysGroup">
+            <label>Выберите дни недели</label>
+            <div class="weekdays-selector">
+              <label class="weekday-pill"><input type="checkbox" name="slotWeekday" value="1"><span>Пн</span></label>
+              <label class="weekday-pill"><input type="checkbox" name="slotWeekday" value="2"><span>Вт</span></label>
+              <label class="weekday-pill"><input type="checkbox" name="slotWeekday" value="3"><span>Ср</span></label>
+              <label class="weekday-pill"><input type="checkbox" name="slotWeekday" value="4"><span>Чт</span></label>
+              <label class="weekday-pill"><input type="checkbox" name="slotWeekday" value="5"><span>Пт</span></label>
+              <label class="weekday-pill"><input type="checkbox" name="slotWeekday" value="6"><span>Сб</span></label>
+              <label class="weekday-pill"><input type="checkbox" name="slotWeekday" value="0"><span>Вс</span></label>
+            </div>
+          </div>
+
           <!-- Block Exercises & Targets Section (Отжимания, Планка и др.) -->
           <div class="slot-exercises-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -1204,6 +1242,6 @@
 
   </div>
 
-  <script src="app.js?v=28"></script>
+  <script src="app.js?v=29"></script>
 </body>
 </html>
