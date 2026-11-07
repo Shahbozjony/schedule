@@ -222,6 +222,41 @@ body {
   box-shadow: 0 0 0 2px var(--primary-glow);
 }
 
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 44px !important;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px 8px;
+  opacity: 0.75;
+  transition: opacity 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  border-radius: var(--radius-sm);
+}
+
+.toggle-password-btn:hover,
+.toggle-password-btn:active {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
 .primary-btn {
   background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   color: white;
