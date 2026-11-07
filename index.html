@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=33">
+  <link rel="stylesheet" href="style.css?v=34">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -860,6 +860,28 @@
           </div>
         </div>
 
+        <!-- PRIVACY MODE (РЕЖИМ ПРИВАТНОСТИ / ИНКОГНИТО В ОНЛАЙН-РЕЙТИНГЕ) -->
+        <div class="section-card privacy-card" style="margin-bottom: 12px; padding: 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <span style="font-size: 24px; line-height: 1;">🌫️</span>
+              <div>
+                <div style="font-size: 14px; font-weight: 700; color: #f1f5f9; display: flex; align-items: center; gap: 6px;">
+                  Режим приватности (Инкогнито)
+                  <span id="privacyStatusBadge" class="privacy-status-pill">Выкл</span>
+                </div>
+                <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px; line-height: 1.4;">
+                  Скрывает имя, фамилию, логин и аватарку в общем онлайн-рейтинге для других пользователей. Они увидят туманный силуэт 🌫️ и «Анонимный атлет».
+                </p>
+              </div>
+            </div>
+            <label class="ios-switch" style="flex-shrink: 0;" title="Включить / выключить режим приватности">
+              <input type="checkbox" id="privacyToggleCheckbox" onchange="togglePrivacyMode(this.checked)">
+              <span class="ios-slider"></span>
+            </label>
+          </div>
+        </div>
+
         <!-- System Web Notifications Trigger -->
         <div class="section-card" style="padding: 14px;">
           <button class="action-btn-row" onclick="requestWebNotificationPermission()" style="width: 100%;">
@@ -890,18 +912,32 @@
 
         </div>
 
-        <!-- DANGER ZONE: RESET DATA -->
+        <!-- DANGER ZONE: RESET DATA & DELETE ACCOUNT -->
         <div class="danger-zone-card" style="margin-bottom: 14px;">
           <div class="danger-header">
             <span class="danger-icon">⚠️</span>
-            <h4>Сброс данных</h4>
+            <h4>Опасная зона</h4>
           </div>
-          <p class="danger-desc">
-            Сброс <b>очистит текущие отметки</b> и вернет расписание и тренировки к начальному состоянию.
-          </p>
-          <button class="delete-account-btn" onclick="confirmResetData()">
-            Сбросить данные к начальным
-          </button>
+
+          <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed rgba(244, 63, 94, 0.25);">
+            <div style="font-size: 13px; font-weight: 700; color: #f87171; margin-bottom: 4px;">Сброс данных</div>
+            <p class="danger-desc" style="margin-bottom: 10px;">
+              Очистит текущие отметки и вернет тренировки к начальному состоянию без удаления самого аккаунта.
+            </p>
+            <button type="button" class="action-btn-danger-outline" onclick="confirmResetData()">
+              🔄 Сбросить данные к начальным
+            </button>
+          </div>
+
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: var(--accent-red); margin-bottom: 4px;">Удаление аккаунта</div>
+            <p class="danger-desc" style="margin-bottom: 10px;">
+              Безвозвратно удалит ваш профиль, логин, расписание, историю тренировок, книги, монеты и все достижения.
+            </p>
+            <button type="button" class="delete-account-btn" onclick="confirmDeleteAccount()">
+              🗑️ Удалить аккаунт навсегда
+            </button>
+          </div>
         </div>
 
         <button type="button" class="cancel-btn" style="width: 100%;" onclick="closeProfileModal()">Закрыть настройки</button>
@@ -1223,6 +1259,6 @@
 
   </div>
 
-  <script src="app.js?v=33"></script>
+  <script src="app.js?v=34"></script>
 </body>
 </html>
