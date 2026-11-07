@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=35">
+  <link rel="stylesheet" href="style.css?v=36">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -356,7 +356,7 @@
                   🪙 <span id="heroCoinsCount">0</span> Coins
                 </div>
                 <div class="steam-trophy-counter" id="steamTrophyCounter">
-                  0 / 18 (0%)
+                  0 / 60 (0%)
                 </div>
               </div>
             </div>
@@ -386,11 +386,13 @@
           <div id="achSubView_trophies">
             <!-- Filter tabs for achievements -->
             <div class="day-filter-bar" style="margin: 0 0 14px 0; overflow-x: auto; white-space: nowrap;">
-              <button class="day-filter-btn active" id="achFilter_all" onclick="setAchievementFilter('all')">Все (18)</button>
+              <button class="day-filter-btn active" id="achFilter_all" onclick="setAchievementFilter('all')">Все (60)</button>
               <button class="day-filter-btn" id="achFilter_reading" onclick="setAchievementFilter('reading')">📚 Книги</button>
               <button class="day-filter-btn" id="achFilter_study" onclick="setAchievementFilter('study')">📑 ACCA</button>
               <button class="day-filter-btn" id="achFilter_sport" onclick="setAchievementFilter('sport')">💪 Спорт</button>
               <button class="day-filter-btn" id="achFilter_discipline" onclick="setAchievementFilter('discipline')">⚡ Дисциплина</button>
+              <button class="day-filter-btn" id="achFilter_social" onclick="setAchievementFilter('social')">👥 Друзья</button>
+              <button class="day-filter-btn" id="achFilter_shop" onclick="setAchievementFilter('shop')">🪙 Стиль & Магазин</button>
               <button class="day-filter-btn" id="achFilter_unlocked" onclick="setAchievementFilter('unlocked')">✓ Открытые</button>
             </div>
 
@@ -1302,6 +1304,6 @@
 
   </div>
 
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>
