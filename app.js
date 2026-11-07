@@ -29,6 +29,7 @@ const WEEK_DAYS = [
 // Default categories
 const DEFAULT_CATEGORIES = [
   { id: 'routine', name: 'Утро / Рутина', emoji: '🌅', color: '#38bdf8' },
+  { id: 'travel', name: 'Дорога / Транспорт', emoji: '🚗', color: '#f59e0b' },
   { id: 'work', name: 'Работа / Учеба', emoji: '💼', color: '#818cf8' },
   { id: 'sport', name: 'Спорт / Тренировка', emoji: '🥊', color: '#f43f5e' },
   { id: 'rest', name: 'Отдых / Обед', emoji: '🧘', color: '#34d399' },
@@ -51,10 +52,12 @@ const DEFAULT_SCHEDULE_SLOTS = [
     ] 
   },
   { id: 's3', name: '🍳 Питательный завтрак и душ', start: '08:00', end: '08:45', category: 'routine', penalty: 2000, exercises: [] },
+  { id: 's_travel1', name: '🚗 Дорога / Время в пути', start: '08:45', end: '09:00', category: 'travel', penalty: 2000, exercises: [] },
   { id: 's4', name: '🎯 Глубокая работа / Учеба (Блок 1)', start: '09:00', end: '13:00', category: 'work', penalty: 10000, exercises: [] },
   { id: 's5', name: '🥗 Обед и перезагрузка', start: '13:00', end: '14:00', category: 'rest', penalty: 2000, exercises: [] },
   { id: 's6', name: '💼 Работа, задачи и проекты (Блок 2)', start: '14:00', end: '18:00', category: 'work', penalty: 10000, exercises: [] },
-  { id: 's7', name: '🚶 Прогулка, разгрузка, свежий воздух', start: '18:00', end: '19:00', category: 'rest', penalty: 3000, exercises: [] },
+  { id: 's_travel2', name: '🚗 Дорога домой / В пути', start: '18:00', end: '18:30', category: 'travel', penalty: 2000, exercises: [] },
+  { id: 's7', name: '🚶 Прогулка, разгрузка, свежий воздух', start: '18:30', end: '19:00', category: 'rest', penalty: 3000, exercises: [] },
   { id: 's8', name: '🍽️ Ужин и время с семьей', start: '19:00', end: '20:30', category: 'routine', penalty: 3000, exercises: [] },
   { id: 's9', name: '📚 Чтение книги и итоги дня', start: '20:30', end: '22:00', category: 'work', penalty: 5000, exercises: [] },
   { id: 's10', name: '🌙 Подготовка ко сну, без гаджетов', start: '22:30', end: '23:00', category: 'sleep', penalty: 5000, exercises: [] }
@@ -132,6 +135,11 @@ function ensureUserDefaults() {
   if (!currentUser.name) currentUser.name = 'Шахбоз';
   if (!currentUser.categories || currentUser.categories.length === 0) {
     currentUser.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  } else {
+    const hasTravel = currentUser.categories.some(c => c.id === 'travel' || c.name.toLowerCase().includes('дорог'));
+    if (!hasTravel) {
+      currentUser.categories.splice(1, 0, { id: 'travel', name: 'Дорога / Транспорт', emoji: '🚗', color: '#f59e0b' });
+    }
   }
   if (!currentUser.scheduleSlots) {
     currentUser.scheduleSlots = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SLOTS));
