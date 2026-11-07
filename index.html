@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=21">
+  <link rel="stylesheet" href="style.css?v=22">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -46,7 +46,10 @@
 
           <div class="input-group">
             <label>Пароль</label>
-            <input type="password" id="loginPassword" placeholder="Schedule2004" required autocomplete="current-password">
+            <div class="password-input-wrap">
+              <input type="password" id="loginPassword" placeholder="Schedule2004" required autocomplete="current-password">
+              <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('loginPassword', this)" title="Показать / скрыть пароль" aria-label="Показать пароль">👁️</button>
+            </div>
           </div>
 
           <button type="submit" class="primary-btn">Войти в систему 🚀</button>
@@ -72,12 +75,18 @@
 
           <div class="input-group">
             <label>Пароль</label>
-            <input type="password" id="regPassword" placeholder="Придумайте пароль" required autocomplete="new-password">
+            <div class="password-input-wrap">
+              <input type="password" id="regPassword" placeholder="Придумайте пароль" required autocomplete="new-password">
+              <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('regPassword', this)" title="Показать / скрыть пароль" aria-label="Показать пароль">👁️</button>
+            </div>
           </div>
 
           <div class="input-group">
             <label>Повторите пароль (подтверждение)</label>
-            <input type="password" id="regConfirmPassword" placeholder="Повторите пароль" required autocomplete="new-password">
+            <div class="password-input-wrap">
+              <input type="password" id="regConfirmPassword" placeholder="Повторите пароль" required autocomplete="new-password">
+              <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('regConfirmPassword', this)" title="Показать / скрыть пароль" aria-label="Показать пароль">👁️</button>
+            </div>
           </div>
 
           <button type="submit" class="primary-btn">Создать профиль ✨</button>
@@ -645,12 +654,18 @@
 
             <div class="input-group" style="margin-bottom: 10px;">
               <label>Новый пароль</label>
-              <input type="password" id="profileNewPass" placeholder="Новый пароль" autocomplete="new-password">
+              <div class="password-input-wrap">
+                <input type="password" id="profileNewPass" placeholder="Новый пароль" autocomplete="new-password">
+                <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('profileNewPass', this)" title="Показать / скрыть пароль" aria-label="Показать пароль">👁️</button>
+              </div>
             </div>
 
             <div class="input-group" style="margin-bottom: 12px;">
               <label>Повторите новый пароль (подтверждение)</label>
-              <input type="password" id="profileConfirmPass" placeholder="Повторите новый пароль еще раз" autocomplete="new-password">
+              <div class="password-input-wrap">
+                <input type="password" id="profileConfirmPass" placeholder="Повторите новый пароль еще раз" autocomplete="new-password">
+                <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('profileConfirmPass', this)" title="Показать / скрыть пароль" aria-label="Показать пароль">👁️</button>
+              </div>
             </div>
 
             <div class="auth-error hidden" id="profileSecurityError" style="margin-bottom: 10px;"></div>
@@ -997,6 +1012,6 @@
 
   </div>
 
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>
