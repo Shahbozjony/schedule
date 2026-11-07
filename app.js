@@ -3152,6 +3152,7 @@ function renderReport() {
   let periodStudyTasks = 0;
   let periodStudySessions = 0;
   const bookPagesMap = {};
+  const exDoneMap = {};
 
   // Category completion counter: { [catId]: { count: 0, totalHours: 0 } }
   const catStats = {};
@@ -3204,14 +3205,20 @@ function renderReport() {
     if (wLog && wLog.exercises) {
       Object.keys(wLog.exercises).forEach(exId => {
         const exData = wLog.exercises[exId];
-        if (exId.includes('plank')) {
-          totalPlankSecs += (exData.done || 0);
-        } else {
-          totalReps += (exData.done || 0);
-          if (exData.sets) {
-            exData.sets.forEach(set => { totalReps += (set.reps || 0); });
-          }
+        const isPlank = exId.includes('plank');
+        const doneVal = (exData.done || 0);
+        let repsInSets = 0;
+        if (exData.sets && Array.isArray(exData.sets)) {
+          exData.sets.forEach(set => { repsInSets += (set.reps || 0); });
         }
+        const totalVal = isPlank ? doneVal : (doneVal + repsInSets);
+
+        if (isPlank) {
+          totalPlankSecs += totalVal;
+        } else {
+          totalReps += totalVal;
+        }
+        exDoneMap[exId] = (exDoneMap[exId] || 0) + totalVal;
       });
     }
 
@@ -3253,7 +3260,7 @@ function renderReport() {
       }
     }
 
-    // Check study blocks in schedule completions
+    // Check study and sport blocks in schedule completions
     dayCompletedSlotIds.forEach(id => {
       const s = slots.find(slot => slot.id === id);
       if (s) {
@@ -3274,6 +3281,24 @@ function renderReport() {
             });
           }
         }
+
+        const isSportSlot = s.category === 'sport' || (s.name && (s.name.toLowerCase().includes('спорт') || s.name.toLowerCase().includes('трен') || s.name.toLowerCase().includes('отжим')));
+        if (isSportSlot && s.exercises && s.exercises.length > 0) {
+          s.exercises.forEach(ex => {
+            const exId = ex.id || ex.name;
+            const targetVal = parseInt(ex.target, 10) || 0;
+            if (!wLog || !wLog.exercises || !wLog.exercises[exId]) {
+              const isPlank = exId.includes('plank') || (ex.name && ex.name.toLowerCase().includes('планк'));
+              if (isPlank) {
+                totalPlankSecs += targetVal;
+              } else {
+                totalReps += targetVal;
+              }
+              exDoneMap[exId] = (exDoneMap[exId] || 0) + targetVal;
+              if (ex.name) exDoneMap[ex.name] = (exDoneMap[ex.name] || 0) + targetVal;
+            }
+          });
+        }
       }
     });
 
@@ -3292,6 +3317,16 @@ function renderReport() {
   // Update Big Cards
   const elReps = document.getElementById('repTotalReps');
   if (elReps) elReps.textContent = totalReps;
+  const elPages = document.getElementById('repTotalPages');
+  if (elPages) {
+    let effectivePages = periodPagesRead;
+    if (effectivePages === 0 && (currentReportPeriod === 'all' || currentReportPeriod === 'month')) {
+      let allTimePages = 0;
+      (currentUser.books || []).forEach(b => { allTimePages += (parseInt(b.currentPage, 10) || 0); });
+      effectivePages = allTimePages;
+    }
+    elPages.textContent = effectivePages;
+  }
   const elPlank = document.getElementById('repTotalPlank');
   if (elPlank) {
     elPlank.textContent = totalPlankSecs > 60 
@@ -3346,16 +3381,17 @@ function renderReport() {
       const row = document.createElement('div');
       row.className = 'exercise-report-item';
       
-      const isPlank = ex.id.includes('plank') || ex.name.toLowerCase().includes('планк');
+      const isPlank = ex.id.includes('plank') || (ex.name && ex.name.toLowerCase().includes('планк'));
+      const doneVal = exDoneMap[ex.id] || (ex.name ? exDoneMap[ex.name] : 0) || 0;
       let valText = '';
       if (isPlank) {
-        valText = totalPlankSecs > 60 
-          ? `${Math.floor(totalPlankSecs / 60)} мин ${totalPlankSecs % 60} сек`
-          : `${totalPlankSecs} сек в планке`;
+        valText = doneVal > 60 
+          ? `${Math.floor(doneVal / 60)} мин ${doneVal % 60} сек`
+          : `${doneVal} сек в планке`;
       } else if (ex.type === 'sets') {
-        valText = `Цель: ${ex.target} подх.`;
+        valText = `${doneVal} подх.`;
       } else {
-        valText = `${totalReps} повторений`;
+        valText = `${doneVal} повторений`;
       }
 
       row.innerHTML = `
