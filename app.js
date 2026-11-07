@@ -218,24 +218,42 @@ function initUserData() {
     }
   }
 
-  // Clean achievements storage: migrate any 'shahboz' unlockedBy to 'shahbozjony'
-  try {
-    const rawAch = localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY);
-    if (rawAch) {
-      let achs = JSON.parse(rawAch);
-      let changed = false;
-      achs.forEach(a => {
-        if (a.unlockedBy && Array.isArray(a.unlockedBy)) {
-          const idx = a.unlockedBy.findIndex(u => u.toLowerCase() === 'shahboz');
-          if (idx !== -1) {
-            a.unlockedBy[idx] = 'shahbozjony';
-            changed = true;
+  // MIGRATION: Wipe all achievements if not cleaned yet to start completely fresh at 0/18
+  const CLEAN_ACH_FLAG = 'discipline_ach_clean_v5';
+  if (!localStorage.getItem(CLEAN_ACH_FLAG)) {
+    // Reset achievements storage to clean list (all unlockedBy: [])
+    localStorage.setItem(APP_ACHIEVEMENTS_KEY, JSON.stringify(DEFAULT_ACHIEVEMENTS));
+    localStorage.removeItem('discipline_steam_achievements_v1');
+    localStorage.removeItem('discipline_achievements_v2');
+    Object.values(users).forEach(u => {
+      u.unlockedAchievementsHistory = [];
+      u.coins = u.coins || 0;
+      u.inventory = u.inventory || [];
+      u.equippedFont = u.equippedFont || '';
+      u.equippedBadge = u.equippedBadge || '';
+    });
+    saveAllUsers(users);
+    localStorage.setItem(CLEAN_ACH_FLAG, 'true');
+  } else {
+    // Ensure no 'shahboz' exists in any achievement
+    try {
+      const raw = localStorage.getItem(APP_ACHIEVEMENTS_KEY);
+      if (raw) {
+        let achs = JSON.parse(raw);
+        let changed = false;
+        achs.forEach(a => {
+          if (a.unlockedBy && Array.isArray(a.unlockedBy)) {
+            const hasOld = a.unlockedBy.some(u => u.toLowerCase() === 'shahboz');
+            if (hasOld) {
+              a.unlockedBy = a.unlockedBy.filter(u => u.toLowerCase() !== 'shahboz');
+              changed = true;
+            }
           }
-        }
-      });
-      if (changed) localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(achs));
-    }
-  } catch(e) {}
+        });
+        if (changed) localStorage.setItem(APP_ACHIEVEMENTS_KEY, JSON.stringify(achs));
+      }
+    } catch(e) {}
+  }
 
   // Check active session
   let activeSession = localStorage.getItem(APP_SESSION_KEY);
@@ -256,6 +274,11 @@ function initUserData() {
 function ensureUserDefaults() {
   if (!currentUser) return;
   if (!currentUser.name) currentUser.name = 'Шахбоз';
+  if (currentUser.coins === undefined) currentUser.coins = 0;
+  if (!currentUser.inventory) currentUser.inventory = [];
+  if (!currentUser.equippedFont) currentUser.equippedFont = '';
+  if (!currentUser.equippedBadge) currentUser.equippedBadge = '';
+  if (!currentUser.unlockedAchievementsHistory) currentUser.unlockedAchievementsHistory = [];
   if (!currentUser.categories || currentUser.categories.length === 0) {
     currentUser.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   } else {
@@ -682,6 +705,8 @@ function switchView(viewId) {
   if (viewId === 'viewAchievements') {
     checkAutomaticAchievements();
     renderAchievements();
+    renderShop();
+    renderLeaderboard();
   }
   if (viewId === 'viewReport') {
     renderReport();
@@ -717,17 +742,28 @@ function renderUserProfile() {
   const userAvatar = document.getElementById('userAvatar');
   if (userAvatar) userAvatar.textContent = firstLetter;
 
+  const fontClass = currentUser.equippedFont || '';
+  const badgeHtml = getBadgeHtml(currentUser.equippedBadge);
+
   const displayName = document.getElementById('displayName');
-  if (displayName) displayName.textContent = currentUser.name;
+  if (displayName) {
+    displayName.className = fontClass;
+    displayName.innerHTML = `${escapeHtml(currentUser.name)} ${badgeHtml}`;
+  }
 
   const profileBigAvatar = document.getElementById('profileBigAvatar');
   if (profileBigAvatar) profileBigAvatar.textContent = firstLetter;
 
   const profileName = document.getElementById('profileName');
-  if (profileName) profileName.textContent = currentUser.name;
+  if (profileName) {
+    profileName.className = fontClass;
+    profileName.innerHTML = `${escapeHtml(currentUser.name)} ${badgeHtml}`;
+  }
 
   const profileUsername = document.getElementById('profileUsername');
   if (profileUsername) profileUsername.textContent = `@${currentUser.username}`;
+
+  updateUserCoinsUI();
 
   const createdDate = new Date(currentUser.createdAt || Date.now());
   const memberSince = document.getElementById('memberSince');
@@ -744,6 +780,16 @@ function renderUserProfile() {
   if (confirmEl) confirmEl.value = '';
   const secErr = document.getElementById('profileSecurityError');
   if (secErr) secErr.classList.add('hidden');
+}
+
+function updateUserCoinsUI() {
+  const coins = currentUser ? (currentUser.coins || 0) : 0;
+  const topCoinsCount = document.getElementById('topCoinsCount');
+  if (topCoinsCount) topCoinsCount.textContent = coins;
+  const heroCoinsCount = document.getElementById('heroCoinsCount');
+  if (heroCoinsCount) heroCoinsCount.textContent = coins;
+  const shopBalanceCoins = document.getElementById('shopBalanceCoins');
+  if (shopBalanceCoins) shopBalanceCoins.textContent = coins;
 }
 
 function openProfileModal() {
@@ -3880,10 +3926,11 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первые строки',
     desc: 'Прочитать первые 50 страниц в трекере',
     tier: 'bronze',
+    coinsAward: 50,
     category: 'reading',
     metric: 'pages',
     target: 50,
-    unlockedBy: ['shahbozjony']
+    unlockedBy: []
   },
   {
     id: 'ach_book_1',
@@ -3891,10 +3938,11 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Книжный дебют',
     desc: 'Полностью прочитать 1-ю книгу',
     tier: 'bronze',
+    coinsAward: 50,
     category: 'reading',
     metric: 'books',
     target: 1,
-    unlockedBy: ['shahbozjony']
+    unlockedBy: []
   },
   {
     id: 'ach_read_1000',
@@ -3902,6 +3950,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Книжный червь',
     desc: 'Прочитать суммарно 1 000 страниц',
     tier: 'silver',
+    coinsAward: 100,
     category: 'reading',
     metric: 'pages',
     target: 1000,
@@ -3913,6 +3962,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Книжная полка',
     desc: 'Полностью прочитать 10 книг',
     tier: 'silver',
+    coinsAward: 100,
     category: 'reading',
     metric: 'books',
     target: 10,
@@ -3924,6 +3974,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Библиотекарь',
     desc: 'Прочитать 5 000 страниц полезной литературы',
     tier: 'gold',
+    coinsAward: 250,
     category: 'reading',
     metric: 'pages',
     target: 5000,
@@ -3935,6 +3986,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Легенда чтения',
     desc: 'Закончить 100 книг (элитный читательский клуб)',
     tier: 'platinum',
+    coinsAward: 500,
     category: 'reading',
     metric: 'books',
     target: 100,
@@ -3948,10 +4000,11 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Студент ACCA',
     desc: 'Разобрать первые 50 задач или учебных тем',
     tier: 'bronze',
+    coinsAward: 50,
     category: 'study',
     metric: 'study_tasks',
     target: 50,
-    unlockedBy: ['shahbozjony']
+    unlockedBy: []
   },
   {
     id: 'ach_pomodoro_20',
@@ -3959,6 +4012,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Мастер концентрации',
     desc: 'Провести 20 учебных сессий по расписанию',
     tier: 'silver',
+    coinsAward: 100,
     category: 'study',
     metric: 'study_sessions',
     target: 20,
@@ -3970,6 +4024,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Экзаменационный штурм',
     desc: 'Решить 500 задач из Exam Kit (BPP / Kaplan)',
     tier: 'gold',
+    coinsAward: 250,
     category: 'study',
     metric: 'study_tasks',
     target: 500,
@@ -3981,6 +4036,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Член ассоциации (ACCA Master)',
     desc: 'Завершить всю программу подготовки к экзамену ACCA',
     tier: 'platinum',
+    coinsAward: 500,
     category: 'study',
     metric: 'study_master',
     target: 1,
@@ -3994,10 +4050,11 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первая кровь',
     desc: 'Сделать первые 100 отжиманий суммарно',
     tier: 'bronze',
+    coinsAward: 50,
     category: 'sport',
     metric: 'reps',
     target: 100,
-    unlockedBy: ['shahbozjony']
+    unlockedBy: []
   },
   {
     id: 'ach_rep_1000',
@@ -4005,6 +4062,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Железная сотня',
     desc: 'Сделать 1 000 повторений упражнений',
     tier: 'silver',
+    coinsAward: 100,
     category: 'sport',
     metric: 'reps',
     target: 1000,
@@ -4016,6 +4074,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Спартанец',
     desc: 'Сделать 5 000 чистых повторений',
     tier: 'gold',
+    coinsAward: 250,
     category: 'sport',
     metric: 'reps',
     target: 5000,
@@ -4027,6 +4086,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Титановый атлет',
     desc: 'Сделать 10 000 чистых повторений (машина дисциплины)',
     tier: 'platinum',
+    coinsAward: 500,
     category: 'sport',
     metric: 'reps',
     target: 10000,
@@ -4040,10 +4100,11 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Чистый лист',
     desc: 'Закрыть день по расписанию без единого штрафа',
     tier: 'bronze',
+    coinsAward: 50,
     category: 'discipline',
     metric: 'clean_days',
     target: 1,
-    unlockedBy: ['shahbozjony']
+    unlockedBy: []
   },
   {
     id: 'ach_streak_7',
@@ -4051,6 +4112,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Неделя без пощады',
     desc: 'Удержать 7 дней дисциплинарного стрика',
     tier: 'silver',
+    coinsAward: 100,
     category: 'discipline',
     metric: 'streak',
     target: 7,
@@ -4062,6 +4124,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Месяц стали',
     desc: '30 дней непрерывного соблюдения расписания',
     tier: 'gold',
+    coinsAward: 250,
     category: 'discipline',
     metric: 'streak',
     target: 30,
@@ -4073,6 +4136,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Властелин времени',
     desc: '100 дней железной дисциплины и 0 сум штрафов',
     tier: 'platinum',
+    coinsAward: 500,
     category: 'discipline',
     metric: 'streak',
     target: 100,
@@ -4141,6 +4205,8 @@ function checkAutomaticAchievements() {
 
   let totalStudyTasks = 0;
   let totalStudySessions = 0;
+  let accaStudyTextPages = 0;
+
   if (currentUser.studyLogs) {
     Object.values(currentUser.studyLogs).forEach(log => {
       if (log.scheduleDone) {
@@ -4152,6 +4218,28 @@ function checkAutomaticAchievements() {
         });
       }
     });
+  }
+
+  // Also check schedule completions
+  if (currentUser.scheduleCompletions && currentUser.scheduleSlots) {
+    Object.entries(currentUser.scheduleCompletions).forEach(([dateStr, slotIds]) => {
+      slotIds.forEach(slotId => {
+        const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
+        if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
+          totalStudySessions++;
+          if (slot.exercises) {
+            slot.exercises.forEach(ex => {
+              totalStudyTasks += (parseInt(ex.target, 10) || 1);
+            });
+          }
+        }
+      });
+    });
+  }
+
+  const accaBook = (currentUser.books || []).find(b => (b.id && b.id.includes('acca')) || (b.title && b.title.toLowerCase().includes('acca')));
+  if (accaBook) {
+    accaStudyTextPages = parseInt(accaBook.currentPage, 10) || parseInt(accaBook.basePage, 10) || 0;
   }
 
   let cleanDays = 0;
@@ -4167,6 +4255,8 @@ function checkAutomaticAchievements() {
 
   achievements.forEach(ach => {
     if (!ach.unlockedBy) ach.unlockedBy = [];
+    ach.unlockedBy = ach.unlockedBy.filter(u => u.toLowerCase() !== 'shahboz');
+
     const isUnlocked = ach.unlockedBy.some(u => u.toLowerCase() === username);
     if (!isUnlocked) {
       let meetsCondition = false;
@@ -4175,12 +4265,22 @@ function checkAutomaticAchievements() {
       if (ach.metric === 'reps' && totalReps >= ach.target) meetsCondition = true;
       if (ach.metric === 'study_tasks' && totalStudyTasks >= ach.target) meetsCondition = true;
       if (ach.metric === 'study_sessions' && totalStudySessions >= ach.target) meetsCondition = true;
+      if (ach.metric === 'study_master' && accaStudyTextPages >= 480) meetsCondition = true;
       if (ach.metric === 'clean_days' && cleanDays >= ach.target) meetsCondition = true;
       if (ach.metric === 'streak' && streak >= ach.target) meetsCondition = true;
 
       if (meetsCondition) {
         ach.unlockedBy.push(username);
         updated = true;
+
+        // Award Coins for opening achievement
+        const coinsAward = ach.coinsAward || (ach.tier === 'platinum' ? 500 : ach.tier === 'gold' ? 250 : ach.tier === 'silver' ? 100 : 50);
+        if (!currentUser.unlockedAchievementsHistory) currentUser.unlockedAchievementsHistory = [];
+        if (!currentUser.unlockedAchievementsHistory.includes(ach.id)) {
+          currentUser.unlockedAchievementsHistory.push(ach.id);
+          currentUser.coins = (currentUser.coins || 0) + coinsAward;
+          saveCurrentUser();
+        }
       }
     }
   });
@@ -4188,6 +4288,8 @@ function checkAutomaticAchievements() {
   if (updated) {
     saveAchievements(achievements);
     playHapticSound('targetAchieved');
+    updateTrophyTopBadge();
+    updateUserCoinsUI();
   }
 }
 
@@ -4195,7 +4297,7 @@ function updateTrophyTopBadge() {
   if (!currentUser) return;
   const username = (currentUser.username || 'shahbozjony').toLowerCase();
   const achievements = getAchievements();
-  const userUnlocked = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username));
+  const userUnlocked = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz'));
   const badge = document.getElementById('topAchBadge');
   if (badge) {
     badge.textContent = userUnlocked.length;
@@ -4204,10 +4306,11 @@ function updateTrophyTopBadge() {
 
 function openAchievementsModal() {
   switchView('viewAchievements');
+  switchAchievementsSubTab('trophies');
 }
 
 function closeAchievementsModal() {
-  // If called anywhere, redirect to schedule or keep in view
+  // modal deprecated in favor of main view
 }
 
 function setAchievementFilter(filter) {
@@ -4232,7 +4335,7 @@ function renderAchievements() {
 
   // Overall stats
   const totalCount = achievements.length;
-  const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username)).length;
+  const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz')).length;
   const overallPct = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
 
   const counterEl = document.getElementById('steamTrophyCounter');
@@ -4242,11 +4345,12 @@ function renderAchievements() {
   if (barEl) barEl.style.width = `${overallPct}%`;
 
   updateTrophyTopBadge();
+  updateUserCoinsUI();
 
   // Filter
   const filtered = achievements.filter(ach => {
     if (currentAchievementFilter === 'all') return true;
-    if (currentAchievementFilter === 'unlocked') return (ach.unlockedBy || []).some(u => u.toLowerCase() === username);
+    if (currentAchievementFilter === 'unlocked') return (ach.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz');
     return ach.category === currentAchievementFilter;
   });
 
@@ -4262,6 +4366,12 @@ function renderAchievements() {
   // Get current user progress stats for display
   let totalPagesRead = 0;
   (currentUser.books || []).forEach(b => { totalPagesRead += (parseInt(b.currentPage, 10) || 0); });
+  if (currentUser.studyLogs) {
+    Object.values(currentUser.studyLogs).forEach(log => {
+      if (log.bookPages) Object.values(log.bookPages).forEach(p => { totalPagesRead += (parseInt(p, 10) || 0); });
+    });
+  }
+
   let booksCompleted = (currentUser.books || []).filter(b => b.status === 'completed' || parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10)).length;
   let totalReps = 0;
   if (currentUser.workoutLogs) {
@@ -4270,8 +4380,50 @@ function renderAchievements() {
     });
   }
 
+  let totalStudyTasks = 0;
+  let totalStudySessions = 0;
+  let accaStudyTextPages = 0;
+  if (currentUser.studyLogs) {
+    Object.values(currentUser.studyLogs).forEach(log => {
+      if (log.scheduleDone) {
+        Object.values(log.scheduleDone).forEach(val => { totalStudyTasks += (parseInt(val, 10) || 0); });
+      }
+      if (log.scheduleSets) {
+        Object.values(log.scheduleSets).forEach(arr => {
+          if (Array.isArray(arr)) totalStudySessions += arr.filter(v => v > 0).length;
+        });
+      }
+    });
+  }
+  if (currentUser.scheduleCompletions && currentUser.scheduleSlots) {
+    Object.entries(currentUser.scheduleCompletions).forEach(([dateStr, slotIds]) => {
+      slotIds.forEach(slotId => {
+        const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
+        if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
+          totalStudySessions++;
+          if (slot.exercises) {
+            slot.exercises.forEach(ex => { totalStudyTasks += (parseInt(ex.target, 10) || 1); });
+          }
+        }
+      });
+    });
+  }
+  const accaBook = (currentUser.books || []).find(b => (b.id && b.id.includes('acca')) || (b.title && b.title.toLowerCase().includes('acca')));
+  if (accaBook) {
+    accaStudyTextPages = parseInt(accaBook.currentPage, 10) || parseInt(accaBook.basePage, 10) || 0;
+  }
+
+  let cleanDays = 0;
+  if (currentUser.workoutLogs) {
+    Object.values(currentUser.workoutLogs).forEach(log => {
+      if (log.status === 'success' || (log.penalty === 0 && log.exercises && Object.keys(log.exercises).length > 0)) {
+        cleanDays++;
+      }
+    });
+  }
+
   filtered.forEach(ach => {
-    const isUnlocked = (ach.unlockedBy || []).some(u => u.toLowerCase() === username);
+    const isUnlocked = (ach.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz');
     const tierLabels = {
       bronze: '🥉 Бронза',
       silver: '🥈 Серебро',
@@ -4279,20 +4431,29 @@ function renderAchievements() {
       platinum: '💎 Платина'
     };
 
-    // Calculate progress value
+    // Calculate progress value & units
     let curVal = 0;
-    if (ach.metric === 'pages') curVal = totalPagesRead;
-    else if (ach.metric === 'books') curVal = booksCompleted;
-    else if (ach.metric === 'reps') curVal = totalReps;
-    else if (ach.metric === 'streak') curVal = currentUser.streak || 0;
-    else curVal = isUnlocked ? ach.target : 0;
+    let unitLabel = 'ед.';
+    if (ach.metric === 'pages') { curVal = totalPagesRead; unitLabel = 'стр.'; }
+    else if (ach.metric === 'books') { curVal = booksCompleted; unitLabel = 'книг'; }
+    else if (ach.metric === 'study_tasks') { curVal = totalStudyTasks; unitLabel = 'задач/разделов'; }
+    else if (ach.metric === 'study_sessions') { curVal = totalStudySessions; unitLabel = 'сессий'; }
+    else if (ach.metric === 'study_master') { curVal = accaStudyTextPages; unitLabel = 'стр. Study Text'; }
+    else if (ach.metric === 'reps') { curVal = totalReps; unitLabel = 'повт.'; }
+    else if (ach.metric === 'clean_days') { curVal = cleanDays; unitLabel = 'дн.'; }
+    else if (ach.metric === 'streak') { curVal = currentUser.streak || currentUser.studyStreak || 0; unitLabel = 'дн.'; }
+    else { curVal = isUnlocked ? ach.target : 0; }
 
+    const remaining = Math.max(0, ach.target - curVal);
     const progPct = Math.min(100, Math.round((curVal / ach.target) * 100));
 
-    // Users list
-    const usersChipsHtml = (ach.unlockedBy && ach.unlockedBy.length > 0)
-      ? ach.unlockedBy.map(u => `<span class="steam-user-chip">👤 @${escapeHtml(u)}</span>`).join('')
+    // Clean users list
+    const validUsers = (ach.unlockedBy || []).filter(u => u.toLowerCase() !== 'shahboz');
+    const usersChipsHtml = (validUsers.length > 0)
+      ? validUsers.map(u => `<span class="steam-user-chip">👤 @${escapeHtml(u)}</span>`).join('')
       : '<span style="color: var(--text-dim);">Пока никто не достиг</span>';
+
+    const coinsTag = ach.coinsAward ? `<span class="gold-coins-pill">🪙 +${ach.coinsAward} Coins</span>` : '';
 
     const card = document.createElement('div');
     card.className = `steam-ach-card tier-${ach.tier} ${isUnlocked ? 'unlocked' : 'locked'}`;
@@ -4302,10 +4463,13 @@ function renderAchievements() {
           ${isUnlocked ? ach.icon : '🔒'}
         </div>
         <div class="steam-ach-info">
-          <div class="steam-ach-header">
-            <span class="steam-tier-badge">${tierLabels[ach.tier] || ach.tier}</span>
+          <div class="steam-ach-header" style="flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="steam-tier-badge">${tierLabels[ach.tier] || ach.tier}</span>
+              ${coinsTag}
+            </div>
             <span style="font-size: 11px; font-weight: 700; color: ${isUnlocked ? 'var(--accent-green)' : 'var(--text-dim)'};">
-              ${isUnlocked ? '✓ Разблокировано 🏆' : '🔒 Заблокировано'}
+              ${isUnlocked ? '✓ Разблокировано 🏆' : '🔒 В процессе'}
             </span>
           </div>
           <div class="steam-ach-title">${escapeHtml(ach.title)}</div>
@@ -4313,7 +4477,7 @@ function renderAchievements() {
 
           <div class="steam-ach-progress-wrap">
             <div class="steam-ach-progress-text">
-              <span>Прогресс: <b>${Math.min(curVal, ach.target)}</b> / <b>${ach.target}</b></span>
+              <span>Прогресс: <b>${Math.min(curVal, ach.target)}</b> / <b>${ach.target}</b> ${unitLabel} ${!isUnlocked ? `• <span style="color: #f59e0b; font-weight: 700;">⏳ Осталось: ${remaining} ${unitLabel}</span>` : '• <span style="color: var(--accent-green); font-weight: 700;">Выполнено! 🎉</span>'}</span>
               <span>${progPct}%</span>
             </div>
             <div class="today-rep-bar-bg" style="height: 6px;">
@@ -4337,6 +4501,27 @@ function renderAchievements() {
     `;
     container.appendChild(card);
   });
+}
+
+function resetMyAchievements() {
+  if (!confirm('Вы точно хотите сбросить все свои достижения и начать заново с чистого листа (0/18)?')) return;
+  const username = currentUser ? (currentUser.username || 'shahbozjony').toLowerCase() : 'shahbozjony';
+  const achievements = getAchievements();
+  achievements.forEach(ach => {
+    if (ach.unlockedBy && Array.isArray(ach.unlockedBy)) {
+      ach.unlockedBy = ach.unlockedBy.filter(u => u.toLowerCase() !== username && u.toLowerCase() !== 'shahboz');
+    }
+  });
+  saveAchievements(achievements);
+  if (currentUser) {
+    currentUser.unlockedAchievementsHistory = [];
+    saveCurrentUser();
+  }
+  renderAchievements();
+  updateTrophyTopBadge();
+  updateUserCoinsUI();
+  renderLeaderboard();
+  alert('🧹 Все ваши достижения успешно сброшены! Прогресс обновлен (0/18).');
 }
 
 function toggleAchievementForUser(achId) {
@@ -4364,6 +4549,380 @@ function toggleAchievementForUser(achId) {
 
   saveAchievements(achievements);
   renderAchievements();
+  renderLeaderboard();
+}
+
+/* =========================================================
+   COINS SHOP & REWARDS SYSTEM
+   ========================================================= */
+
+const SHOP_ITEMS = [
+  // --- ШРИФТЫ ДЛЯ ЛОГИНА (БУКВЫ ГОРЯТ И СИЯЮТ) ---
+  {
+    id: 'font_fire',
+    category: 'font',
+    name: '🔥 Огненный шрифт («Буквы горят»)',
+    desc: 'Буквы пылают живым огненным свечением с анимацией языков пламени!',
+    price: 150,
+    cssClass: 'user-font-fire',
+    previewHtml: '<span class="user-font-fire">@USER</span>'
+  },
+  {
+    id: 'font_cyber',
+    category: 'font',
+    name: '⚡ Кибер Неон (Electric Cyan)',
+    desc: 'Футуристическое неоновое свечение в стиле Cyberpunk.',
+    price: 120,
+    cssClass: 'user-font-cyber',
+    previewHtml: '<span class="user-font-cyber">@USER</span>'
+  },
+  {
+    id: 'font_gold',
+    category: 'font',
+    name: '👑 Королевское Золото (Imperial Gold)',
+    desc: 'Роскошное металлизированное золотое сияние для победителей.',
+    price: 200,
+    cssClass: 'user-font-gold',
+    previewHtml: '<span class="user-font-gold">@USER</span>'
+  },
+  {
+    id: 'font_matrix',
+    category: 'font',
+    name: '🟢 Зелёная Матрица (Matrix Code)',
+    desc: 'Кибернетическое изумрудное свечение хакера дисциплины.',
+    price: 100,
+    cssClass: 'user-font-matrix',
+    previewHtml: '<span class="user-font-matrix">@USER</span>'
+  },
+
+  // --- ЗНАЧКИ В ЛОГИН (КАК В TELEGRAM PLUS) ---
+  {
+    id: 'badge_lightning',
+    category: 'badge',
+    name: '⚡ Золотая молния (Telegram Plus)',
+    desc: 'Премиум значок энергии Telegram Plus рядом с вашим логином.',
+    price: 80,
+    badgeHtml: '<span class="tg-badge tg-badge-lightning">⚡</span>',
+    previewHtml: '@USER <span class="tg-badge tg-badge-lightning">⚡</span>'
+  },
+  {
+    id: 'badge_diamond',
+    category: 'badge',
+    name: '💎 Сияющий кристалл (Telegram Diamond)',
+    desc: 'Драгоценный алмаз дисциплины с ярким неоновым блеском.',
+    price: 100,
+    badgeHtml: '<span class="tg-badge tg-badge-diamond">💎</span>',
+    previewHtml: '@USER <span class="tg-badge tg-badge-diamond">💎</span>'
+  },
+  {
+    id: 'badge_crown',
+    category: 'badge',
+    name: '👑 Корона Дисциплины (Discipline King)',
+    desc: 'Символ абсолютной верности своему графику и целям.',
+    price: 180,
+    badgeHtml: '<span class="tg-badge tg-badge-crown">👑</span>',
+    previewHtml: '@USER <span class="tg-badge tg-badge-crown">👑</span>'
+  },
+  {
+    id: 'badge_fire',
+    category: 'badge',
+    name: '🔥 Огонь Стрика (Streak Fire)',
+    desc: 'Подтверждение того, что ваш тренировочный и учебный стрик пылает!',
+    price: 70,
+    badgeHtml: '<span class="tg-badge tg-badge-fire">🔥</span>',
+    previewHtml: '@USER <span class="tg-badge tg-badge-fire">🔥</span>'
+  },
+  {
+    id: 'badge_rocket',
+    category: 'badge',
+    name: '🚀 Ракета Прорыва (Rocket Star)',
+    desc: 'Стремительное ускорение в карьере, учёбе ACCA и спорте.',
+    price: 90,
+    badgeHtml: '<span class="tg-badge tg-badge-rocket">🚀</span>',
+    previewHtml: '@USER <span class="tg-badge tg-badge-rocket">🚀</span>'
+  },
+  {
+    id: 'badge_shield',
+    category: 'badge',
+    name: '🛡️ Щит Спартанца (Spartan Shield)',
+    desc: 'Знак железной защиты от лени и пропусков тренировок.',
+    price: 110,
+    badgeHtml: '<span class="tg-badge tg-badge-shield">🛡️</span>',
+    previewHtml: '@USER <span class="tg-badge tg-badge-shield">🛡️</span>'
+  }
+];
+
+function getBadgeHtml(badgeId) {
+  if (!badgeId) return '';
+  const item = SHOP_ITEMS.find(i => i.id === badgeId && i.category === 'badge');
+  return item ? item.badgeHtml : '';
+}
+
+function switchAchievementsSubTab(subTab) {
+  ['trophies', 'shop', 'leaderboard'].forEach(t => {
+    const btn = document.getElementById(`subtabBtn_${t}`);
+    const view = document.getElementById(`achSubView_${t}`);
+    if (btn) {
+      if (t === subTab) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+    if (view) {
+      if (t === subTab) view.classList.remove('hidden');
+      else view.classList.add('hidden');
+    }
+  });
+
+  if (subTab === 'trophies') renderAchievements();
+  if (subTab === 'shop') renderShop();
+  if (subTab === 'leaderboard') renderLeaderboard();
+}
+
+function openShopView() {
+  switchView('viewAchievements');
+  switchAchievementsSubTab('shop');
+}
+
+function renderShop() {
+  if (!currentUser) return;
+  updateUserCoinsUI();
+
+  const inventory = currentUser.inventory || [];
+  const coins = currentUser.coins || 0;
+  const uname = currentUser.username || 'shahbozjony';
+
+  // Render fonts
+  const fontsGrid = document.getElementById('shopFontsGrid');
+  if (fontsGrid) {
+    fontsGrid.innerHTML = '';
+    const fontItems = SHOP_ITEMS.filter(i => i.category === 'font');
+    fontItems.forEach(item => {
+      const isOwned = inventory.includes(item.id);
+      const isEquipped = currentUser.equippedFont === item.cssClass;
+      const preview = item.previewHtml.replace('@USER', `@${uname}`);
+
+      let actionBtn = '';
+      if (!isOwned) {
+        const canAfford = coins >= item.price;
+        actionBtn = `
+          <button type="button" class="shop-buy-btn" ${canAfford ? '' : 'disabled'} onclick="buyShopItem('${item.id}')">
+            Купить за ${item.price} 🪙
+          </button>
+        `;
+      } else if (isEquipped) {
+        actionBtn = `
+          <button type="button" class="shop-unequip-btn" onclick="unequipShopItem('${item.id}')">
+            ✓ Надет (Снять)
+          </button>
+        `;
+      } else {
+        actionBtn = `
+          <button type="button" class="shop-equip-btn" onclick="equipShopItem('${item.id}')">
+            Надеть ✨
+          </button>
+        `;
+      }
+
+      const card = document.createElement('div');
+      card.className = `shop-item-card ${isEquipped ? 'equipped' : ''}`;
+      card.innerHTML = `
+        <div>
+          <div class="shop-item-title">${item.name}</div>
+          <div class="shop-item-desc">${item.desc}</div>
+          <div class="shop-preview-box">${preview}</div>
+        </div>
+        <div class="shop-item-footer">
+          <span class="gold-coins-pill">🪙 ${item.price}</span>
+          ${actionBtn}
+        </div>
+      `;
+      fontsGrid.appendChild(card);
+    });
+  }
+
+  // Render badges
+  const badgesGrid = document.getElementById('shopBadgesGrid');
+  if (badgesGrid) {
+    badgesGrid.innerHTML = '';
+    const badgeItems = SHOP_ITEMS.filter(i => i.category === 'badge');
+    badgeItems.forEach(item => {
+      const isOwned = inventory.includes(item.id);
+      const isEquipped = currentUser.equippedBadge === item.id;
+      const preview = item.previewHtml.replace('@USER', `@${uname}`);
+
+      let actionBtn = '';
+      if (!isOwned) {
+        const canAfford = coins >= item.price;
+        actionBtn = `
+          <button type="button" class="shop-buy-btn" ${canAfford ? '' : 'disabled'} onclick="buyShopItem('${item.id}')">
+            Купить за ${item.price} 🪙
+          </button>
+        `;
+      } else if (isEquipped) {
+        actionBtn = `
+          <button type="button" class="shop-unequip-btn" onclick="unequipShopItem('${item.id}')">
+            ✓ Надет (Снять)
+          </button>
+        `;
+      } else {
+        actionBtn = `
+          <button type="button" class="shop-equip-btn" onclick="equipShopItem('${item.id}')">
+            Надеть ✨
+          </button>
+        `;
+      }
+
+      const card = document.createElement('div');
+      card.className = `shop-item-card ${isEquipped ? 'equipped' : ''}`;
+      card.innerHTML = `
+        <div>
+          <div class="shop-item-title">${item.name}</div>
+          <div class="shop-item-desc">${item.desc}</div>
+          <div class="shop-preview-box">${preview}</div>
+        </div>
+        <div class="shop-item-footer">
+          <span class="gold-coins-pill">🪙 ${item.price}</span>
+          ${actionBtn}
+        </div>
+      `;
+      badgesGrid.appendChild(card);
+    });
+  }
+}
+
+function buyShopItem(itemId) {
+  if (!currentUser) return;
+  const item = SHOP_ITEMS.find(i => i.id === itemId);
+  if (!item) return;
+
+  currentUser.coins = currentUser.coins || 0;
+  currentUser.inventory = currentUser.inventory || [];
+
+  if (currentUser.inventory.includes(itemId)) {
+    alert('Этот предмет уже куплен в вашем инвентаре!');
+    return;
+  }
+
+  if (currentUser.coins < item.price) {
+    alert(`Недостаточно Coins! Требуется ${item.price} 🪙, а на балансе ${currentUser.coins} 🪙.\n\nЗакрывайте ежедневные задачи по ACCA, книги и тренировки, чтобы заработать Coins!`);
+    return;
+  }
+
+  currentUser.coins -= item.price;
+  currentUser.inventory.push(itemId);
+
+  // Auto equip
+  if (item.category === 'font') currentUser.equippedFont = item.cssClass;
+  if (item.category === 'badge') currentUser.equippedBadge = item.id;
+
+  saveCurrentUser();
+  playHapticSound('targetAchieved');
+  renderShop();
+  renderUserProfile();
+  updateUserCoinsUI();
+  renderLeaderboard();
+  alert(`🎉 Успешно! Вы приобрели «${item.name}» и применили к профилю!`);
+}
+
+function equipShopItem(itemId) {
+  if (!currentUser) return;
+  const item = SHOP_ITEMS.find(i => i.id === itemId);
+  if (!item) return;
+
+  if (item.category === 'font') currentUser.equippedFont = item.cssClass;
+  if (item.category === 'badge') currentUser.equippedBadge = item.id;
+
+  saveCurrentUser();
+  renderShop();
+  renderUserProfile();
+  renderLeaderboard();
+}
+
+function unequipShopItem(itemId) {
+  if (!currentUser) return;
+  const item = SHOP_ITEMS.find(i => i.id === itemId);
+  if (!item) return;
+
+  if (item.category === 'font' && currentUser.equippedFont === item.cssClass) {
+    currentUser.equippedFont = '';
+  } else if (item.category === 'badge' && currentUser.equippedBadge === item.id) {
+    currentUser.equippedBadge = '';
+  }
+
+  saveCurrentUser();
+  renderShop();
+  renderUserProfile();
+  renderLeaderboard();
+}
+
+/* =========================================================
+   ONLINE LEADERBOARD TABLE
+   ========================================================= */
+
+function renderLeaderboard() {
+  const tbody = document.getElementById('leaderboardTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const usersMap = getAllUsers();
+  const achievements = getAchievements();
+
+  const list = Object.values(usersMap).map(u => {
+    const uNameLower = (u.username || '').toLowerCase();
+    const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(uname => uname.toLowerCase() === uNameLower && uname.toLowerCase() !== 'shahboz')).length;
+    const coins = u.coins || 0;
+    return {
+      user: u,
+      username: u.username || '',
+      displayName: u.name || u.username || 'Пользователь',
+      unlockedCount,
+      coins,
+      equippedFont: u.equippedFont || '',
+      equippedBadge: u.equippedBadge || ''
+    };
+  });
+
+  // Sort by achievements desc, then coins desc
+  list.sort((a, b) => {
+    if (b.unlockedCount !== a.unlockedCount) return b.unlockedCount - a.unlockedCount;
+    return b.coins - a.coins;
+  });
+
+  const currentUName = currentUser ? (currentUser.username || '').toLowerCase() : '';
+
+  list.forEach((item, index) => {
+    const rank = index + 1;
+    const rankMedal = rank === 1 ? '🥇 1' : rank === 2 ? '🥈 2' : rank === 3 ? '🥉 3' : `${rank}`;
+    const isMe = item.username.toLowerCase() === currentUName;
+
+    const firstChar = item.displayName.charAt(0).toUpperCase();
+    const badgeHtml = getBadgeHtml(item.equippedBadge);
+
+    const tr = document.createElement('tr');
+    if (isMe) tr.className = 'lb-current-user';
+
+    tr.innerHTML = `
+      <td class="lb-rank">${rankMedal}</td>
+      <td>
+        <div class="lb-user-cell">
+          <div class="lb-avatar">${firstChar}</div>
+          <div>
+            <div style="font-weight: 800;" class="${item.equippedFont}">
+              ${escapeHtml(item.displayName)} ${badgeHtml} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 4px;">(Вы)</span>' : ''}
+            </div>
+            <div style="font-size: 11px; color: var(--text-dim);">@${escapeHtml(item.username)}</div>
+          </div>
+        </div>
+      </td>
+      <td style="text-align: center;">
+        <span style="font-weight: 800; color: #a5b4fc;">${item.unlockedCount}</span>
+        <span style="font-size: 11px; color: var(--text-dim);"> / 18</span>
+      </td>
+      <td style="text-align: right;">
+        <span class="gold-coins-pill">🪙 ${item.coins}</span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
 function requestWebNotificationPermission() {
