@@ -14,73 +14,15 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=9">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="app">
-    <!-- AUTH SCREEN -->
-    <div id="authScreen" class="screen active">
-      <div class="auth-container">
-        <div class="auth-header">
-          <div class="logo-badge">🔥</div>
-          <h1>Дисциплина OS</h1>
-          <p class="subtitle">Твое жесткое расписание и трекер отжиманий</p>
-        </div>
-
-        <div class="auth-tabs">
-          <button id="tabLoginBtn" class="tab-btn active" onclick="switchAuthTab('login')">Вход</button>
-          <button id="tabRegisterBtn" class="tab-btn" onclick="switchAuthTab('register')">Регистрация</button>
-        </div>
-
-        <!-- Login Form -->
-        <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
-          <div class="input-group">
-            <label for="loginUsername">Логин или Почта</label>
-            <input type="text" id="loginUsername" placeholder="Введите ваш логин" required autocomplete="username">
-          </div>
-          <div class="input-group">
-            <label for="loginPassword">Пароль</label>
-            <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
-          </div>
-          <button type="submit" class="primary-btn pulse">Войти в аккаунт</button>
-          <div id="loginError" class="auth-error hidden"></div>
-
-          <!-- Quick login for saved accounts on this device -->
-          <div id="savedAccountsContainer" class="saved-accounts-box hidden">
-            <div class="saved-acc-title">Аккаунты на этом устройстве:</div>
-            <div id="savedAccountsList" style="display: flex; flex-direction: column; gap: 6px;"></div>
-          </div>
-        </form>
-
-        <!-- Register Form -->
-        <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
-          <div class="input-group">
-            <label for="regName">Ваше имя</label>
-            <input type="text" id="regName" placeholder="Например, Алишер" required>
-          </div>
-          <div class="input-group">
-            <label for="regUsername">Логин (для входа)</label>
-            <input type="text" id="regUsername" placeholder="Придумайте логин" required autocomplete="username">
-          </div>
-          <div class="input-group">
-            <label for="regPassword">Пароль</label>
-            <input type="password" id="regPassword" placeholder="Минимум 4 символа" required autocomplete="new-password">
-          </div>
-          <button type="submit" class="primary-btn">Создать аккаунт</button>
-          <div id="regError" class="auth-error hidden"></div>
-        </form>
-
-        <div class="auth-footer-note">
-          🔒 Все ваши данные привязаны исключительно к вашему аккаунту. При удалении аккаунта всё расписание стирается безвозвратно.
-        </div>
-      </div>
-    </div>
-
-    <!-- MAIN APP SCREEN -->
-    <div id="mainScreen" class="screen hidden">
+    <!-- MAIN APP SCREEN (Прямой доступ без логина и пароля) -->
+    <div id="mainScreen" class="screen">
       <!-- Top App Bar -->
       <header class="top-bar">
         <div class="user-greeting" onclick="openProfileModal()" style="cursor: pointer;" title="Открыть профиль и настройки">
@@ -494,23 +436,19 @@
           </button>
           <input type="file" id="importFileInput" style="display: none" accept=".json" onchange="importDataBackup(event)">
 
-          <button class="action-btn-row logout-btn" onclick="handleLogout()">
-            <span>🚪 Выйти из аккаунта</span>
-            <span class="chevron">›</span>
-          </button>
         </div>
 
-        <!-- DANGER ZONE: DELETE ACCOUNT -->
+        <!-- DANGER ZONE: RESET DATA -->
         <div class="danger-zone-card" style="margin-bottom: 14px;">
           <div class="danger-header">
             <span class="danger-icon">⚠️</span>
-            <h4>Опасная зона</h4>
+            <h4>Сброс данных</h4>
           </div>
           <p class="danger-desc">
-            Удаление аккаунта <b>навсегда сотрет</b> все ваши данные: расписание, историю тренировок и расчет штрафов. Придется регистрироваться заново.
+            Сброс <b>очистит текущие отметки</b> и вернет расписание и тренировки к начальному состоянию.
           </p>
-          <button class="delete-account-btn" onclick="confirmDeleteAccount()">
-            Удалить аккаунт навсегда
+          <button class="delete-account-btn" onclick="confirmResetData()">
+            Сбросить данные к начальным
           </button>
         </div>
 
@@ -596,6 +534,6 @@
 
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
