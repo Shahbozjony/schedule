@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=22">
+  <link rel="stylesheet" href="style.css?v=23">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -41,13 +41,13 @@
           
           <div class="input-group">
             <label>Логин / Username</label>
-            <input type="text" id="loginUsername" placeholder="shahbozjony" value="shahbozjony" required autocomplete="username">
+            <input type="text" id="loginUsername" placeholder="Введите ваш логин" required autocomplete="username">
           </div>
 
           <div class="input-group">
             <label>Пароль</label>
             <div class="password-input-wrap">
-              <input type="password" id="loginPassword" placeholder="Schedule2004" required autocomplete="current-password">
+              <input type="password" id="loginPassword" placeholder="Введите пароль" required autocomplete="current-password">
               <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('loginPassword', this)" title="Показать / скрыть пароль" aria-label="Показать пароль">👁️</button>
             </div>
           </div>
@@ -55,7 +55,7 @@
           <button type="submit" class="primary-btn">Войти в систему 🚀</button>
 
           <p class="auth-footer-note">
-            🔑 Логин: <b>shahbozjony</b> • Пароль: <b>Schedule2004</b>
+            🔐 Персональное расписание, тренировки и достижения
           </p>
         </form>
 
@@ -65,12 +65,12 @@
 
           <div class="input-group">
             <label>Ваше имя</label>
-            <input type="text" id="regName" placeholder="Например: Алишер" required>
+            <input type="text" id="regName" placeholder="Например: Иван" required>
           </div>
 
           <div class="input-group">
             <label>Логин (только латиница и цифры)</label>
-            <input type="text" id="regUsername" placeholder="alisher_fit" required autocomplete="username">
+            <input type="text" id="regUsername" placeholder="username" required autocomplete="username">
           </div>
 
           <div class="input-group">
@@ -84,7 +84,7 @@
           <div class="input-group">
             <label>Повторите пароль (подтверждение)</label>
             <div class="password-input-wrap">
-              <input type="password" id="regConfirmPassword" placeholder="Повторите пароль" required autocomplete="new-password">
+              <input type="password" id="regConfirmPassword" placeholder="Повторите пароль ещё раз" required autocomplete="new-password">
               <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('regConfirmPassword', this)" title="Показать / скрыть пароль" aria-label="Показать пароль">👁️</button>
             </div>
           </div>
@@ -340,50 +340,40 @@
           </div>
         </section>
 
-        <!-- TAB 3: PENALTY BANK (Банка штрафов) -->
-        <section id="viewPenalties" class="app-view hidden">
-          <div class="penalty-hero-card">
-            <div class="penalty-piggy-icon">💰</div>
-            <div class="penalty-title">Банка штрафов</div>
-            <div class="penalty-hero-amount" id="monthlyPenaltyTotal">0 сум</div>
-            <div class="penalty-month-label" id="penaltyMonthLabel">Итого за Октябрь 2026</div>
-            <p class="penalty-rules-tip">
-              * За каждый пропущенный день отжиманий начисляется <b>5 000 сум</b>.
+        <!-- TAB 4: ACHIEVEMENTS (ДОСТИЖЕНИЯ КАК В STEAM) -->
+        <section id="viewAchievements" class="app-view hidden">
+          <div class="steam-hero-card">
+            <div class="steam-hero-top">
+              <div>
+                <span class="badge-tag steam-badge-tag">🏆 Steam Showcase</span>
+                <h2 style="font-size: 20px; margin-top: 4px;">Витрина достижений</h2>
+              </div>
+              <div class="steam-trophy-counter" id="steamTrophyCounter">
+                0 / 18 (0%)
+              </div>
+            </div>
+            <p class="card-desc" style="margin-top: 4px; font-size: 12px;">
+              Выполняй цели по книгам, ACCA, тренировкам и делись трофеями с друзьями!
             </p>
-            <button type="button" class="clear-penalties-btn" onclick="clearAllPenalties()">
-              🧹 Очистить все штрафы (включая сегодня)
-            </button>
-          </div>
 
-          <!-- Month Selector -->
-          <div class="month-selector-bar">
-            <button class="month-nav-btn" onclick="changePenaltyMonth(-1)">‹ Назад</button>
-            <span class="current-selected-month" id="selectedMonthName">Октябрь 2026</span>
-            <button class="month-nav-btn" onclick="changePenaltyMonth(1)">Вперед ›</button>
-          </div>
-
-          <!-- Penalty Breakdown Stats -->
-          <div class="stats-grid three-col">
-            <div class="stat-card">
-              <div class="stat-val text-green" id="monthSuccessDays">0</div>
-              <div class="stat-lbl">Дней в цели</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-val text-red" id="monthMissedDays">0</div>
-              <div class="stat-lbl">Пропусков</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-val text-yellow" id="monthSuccessRate">0%</div>
-              <div class="stat-lbl">Успех</div>
+            <div class="today-rep-bar-bg" style="margin-top: 12px; height: 10px;">
+              <div id="steamOverallProgressBar" class="today-rep-bar-fill" style="width: 0%; background: linear-gradient(90deg, #f59e0b, #ec4899, #8b5cf6);"></div>
             </div>
           </div>
 
-          <!-- Days List in Month -->
-          <div class="section-card month-log-card">
-            <h3>Журнал дней месяца</h3>
-            <div class="month-days-list" id="monthDaysList">
-              <!-- Rendered by JS -->
-            </div>
+          <!-- Filter tabs for achievements -->
+          <div class="day-filter-bar" style="margin: 12px 0 14px 0; overflow-x: auto; white-space: nowrap;">
+            <button class="day-filter-btn active" id="achFilter_all" onclick="setAchievementFilter('all')">Все (18)</button>
+            <button class="day-filter-btn" id="achFilter_reading" onclick="setAchievementFilter('reading')">📚 Книги</button>
+            <button class="day-filter-btn" id="achFilter_study" onclick="setAchievementFilter('study')">📑 ACCA</button>
+            <button class="day-filter-btn" id="achFilter_sport" onclick="setAchievementFilter('sport')">💪 Спорт</button>
+            <button class="day-filter-btn" id="achFilter_discipline" onclick="setAchievementFilter('discipline')">⚡ Дисциплина</button>
+            <button class="day-filter-btn" id="achFilter_unlocked" onclick="setAchievementFilter('unlocked')">✓ Открытые</button>
+          </div>
+
+          <!-- Container for rendered achievement cards -->
+          <div class="steam-achievements-list" id="steamAchievementsList">
+            <!-- Rendered dynamically by JS -->
           </div>
         </section>
 
@@ -492,6 +482,62 @@
               <!-- Rendered by JS -->
             </div>
           </div>
+
+          <!-- Report Section 4: PENALTY BANK & FINANCIAL DISCIPLINE -->
+          <div class="section-card penalty-report-card" style="margin-top: 14px;">
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 12px;">
+              <div>
+                <span class="section-title">💰 Банк штрафов и финансовая дисциплина</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">
+                  Штрафной фонд за пропуски тренировок и режима
+                </p>
+              </div>
+            </div>
+
+            <div class="penalty-hero-card" style="margin-bottom: 14px;">
+              <div class="penalty-piggy-icon">💰</div>
+              <div class="penalty-title">Банка штрафов</div>
+              <div class="penalty-hero-amount" id="monthlyPenaltyTotal">0 сум</div>
+              <div class="penalty-month-label" id="penaltyMonthLabel">Итого за месяц</div>
+              <p class="penalty-rules-tip">
+                * За каждый пропущенный день отжиманий начисляется <b>5 000 сум</b>.
+              </p>
+              <button type="button" class="clear-penalties-btn" onclick="clearAllPenalties()">
+                🧹 Очистить все штрафы (включая сегодня)
+              </button>
+            </div>
+
+            <!-- Month Selector -->
+            <div class="month-selector-bar" style="margin-top: 12px;">
+              <button class="month-nav-btn" onclick="changePenaltyMonth(-1)">‹ Назад</button>
+              <span class="current-selected-month" id="selectedMonthName">Октябрь 2026</span>
+              <button class="month-nav-btn" onclick="changePenaltyMonth(1)">Вперед ›</button>
+            </div>
+
+            <!-- Penalty Breakdown Stats -->
+            <div class="stats-grid three-col" style="margin-top: 12px;">
+              <div class="stat-card">
+                <div class="stat-val text-green" id="monthSuccessDays">0</div>
+                <div class="stat-lbl">Дней в цели</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-val text-red" id="monthMissedDays">0</div>
+                <div class="stat-lbl">Пропусков</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-val text-yellow" id="monthSuccessRate">0%</div>
+                <div class="stat-lbl">Успех</div>
+              </div>
+            </div>
+
+            <!-- Days List in Month -->
+            <div class="section-card month-log-card" style="margin-top: 12px; background: rgba(0,0,0,0.25);">
+              <h3>Журнал дней месяца</h3>
+              <div class="month-days-list" id="monthDaysList">
+                <!-- Rendered by JS -->
+              </div>
+            </div>
+          </div>
         </section>
 
       </main>
@@ -510,9 +556,9 @@
           <span class="tab-icon">💪</span>
           <span class="tab-label">Тренировка</span>
         </button>
-        <button class="nav-tab-item" onclick="switchView('viewPenalties')">
-          <span class="tab-icon">💰</span>
-          <span class="tab-label">Штрафы</span>
+        <button class="nav-tab-item" onclick="switchView('viewAchievements')">
+          <span class="tab-icon">🏆</span>
+          <span class="tab-label">Достижения</span>
         </button>
         <button class="nav-tab-item" onclick="switchView('viewReport')">
           <span class="tab-icon">📊</span>
@@ -620,7 +666,7 @@
         <div class="profile-card" style="padding: 16px; margin-bottom: 12px;">
           <div class="big-avatar" id="profileBigAvatar" style="width: 58px; height: 58px; font-size: 26px;">S</div>
           <h2 id="profileName" style="font-size: 18px;">Шахбоз</h2>
-          <div class="profile-username" id="profileUsername">@shahboz</div>
+          <div class="profile-username" id="profileUsername">@shahbozjony</div>
           <div class="member-since" id="memberSince">В системе с 2026 года</div>
         </div>
 
@@ -637,12 +683,12 @@
           <form onsubmit="handleProfileSecuritySave(event)">
             <div class="input-group" style="margin-bottom: 10px;">
               <label>Логин / Username</label>
-              <input type="text" id="profileEditUsername" placeholder="shahboz" required autocomplete="username">
+              <input type="text" id="profileEditUsername" placeholder="username" required autocomplete="username">
             </div>
 
             <div class="input-group" style="margin-bottom: 10px;">
               <label>Отображаемое имя</label>
-              <input type="text" id="profileEditDisplayName" placeholder="Шахбоз" required>
+              <input type="text" id="profileEditDisplayName" placeholder="Ваше имя" required>
             </div>
 
             <div style="margin: 14px 0 10px 0; padding-top: 10px; border-top: 1px dashed var(--border);">
@@ -967,51 +1013,10 @@
       </div>
     </div>
 
-    <!-- MODAL: STEAM ACHIEVEMENTS SHOWCASE (ДОСТИЖЕНИЯ КАК В STEAM) -->
-    <div id="achievementsModal" class="modal-overlay hidden">
-      <div class="modal-sheet achievements-sheet" style="max-height: 92vh; overflow-y: auto;">
-        <div class="modal-handle"></div>
-        
-        <div class="steam-hero-card">
-          <div class="steam-hero-top">
-            <div>
-              <span class="badge-tag steam-badge-tag">🏆 Steam Achievements</span>
-              <h2 style="font-size: 18px; margin-top: 4px;">Достижения и трофеи</h2>
-            </div>
-            <div class="steam-trophy-counter" id="steamTrophyCounter">
-              0 / 18
-            </div>
-          </div>
-          <p class="card-desc" style="margin-top: 4px; font-size: 12px;">
-            Выполняй цели по книгам, ACCA, тренировкам и соревнуйся с друзьями!
-          </p>
-
-          <div class="today-rep-bar-bg" style="margin-top: 10px; height: 8px;">
-            <div id="steamOverallProgressBar" class="today-rep-bar-fill" style="width: 0%; background: linear-gradient(90deg, #f59e0b, #ec4899, #8b5cf6);"></div>
-          </div>
-        </div>
-
-        <!-- Filter tabs for achievements -->
-        <div class="day-filter-bar" style="margin: 10px 0 14px 0; overflow-x: auto; white-space: nowrap;">
-          <button class="day-filter-btn active" id="achFilter_all" onclick="setAchievementFilter('all')">Все (18)</button>
-          <button class="day-filter-btn" id="achFilter_reading" onclick="setAchievementFilter('reading')">📚 Книги</button>
-          <button class="day-filter-btn" id="achFilter_study" onclick="setAchievementFilter('study')">📑 ACCA</button>
-          <button class="day-filter-btn" id="achFilter_sport" onclick="setAchievementFilter('sport')">💪 Спорт</button>
-          <button class="day-filter-btn" id="achFilter_discipline" onclick="setAchievementFilter('discipline')">⚡ Дисциплина</button>
-          <button class="day-filter-btn" id="achFilter_unlocked" onclick="setAchievementFilter('unlocked')">✓ Открытые</button>
-        </div>
-
-        <!-- Container for rendered achievement cards -->
-        <div class="steam-achievements-list" id="steamAchievementsList">
-          <!-- Rendered dynamically by JS -->
-        </div>
-
-        <button type="button" class="cancel-btn" style="width: 100%; margin-top: 16px;" onclick="closeAchievementsModal()">Закрыть витрину</button>
-      </div>
-    </div>
+    <!-- ACHIEVEMENTS ARE NOW MAIN VIEW 4 (viewAchievements) -->
 
   </div>
 
-  <script src="app.js?v=22"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>
