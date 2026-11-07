@@ -71,6 +71,13 @@ const DEFAULT_EXERCISES = [
   { id: 'ex_plank', name: 'Планка на предплечьях', icon: '⏱️', type: 'reps', target: 120, days: ['tue', 'thu', 'sat'] }
 ];
 
+// Default study & reading activities (ACCA, свободное чтение)
+const DEFAULT_STUDY_ACTIVITIES = [
+  { id: 'study_acca_tasks', name: 'ACCA: Разбор тем и задач', icon: '📑', type: 'reps', unit: 'задач', target: 20, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
+  { id: 'study_reading', name: 'Свободное чтение книг', icon: '📖', type: 'reps', unit: 'стр', target: 30, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
+  { id: 'study_acca_sessions', name: 'ACCA: Учебные сессии (помодоро)', icon: '⏱️', type: 'sets', unit: 'сессий', target: 4, days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] }
+];
+
 // Initialize application on page load (Прямой вход без пароля!)
 document.addEventListener('DOMContentLoaded', () => {
   initLiveClock();
@@ -175,7 +182,47 @@ function ensureUserDefaults() {
     }
   });
 
+  // Ensure study & reading activities (ACCA, Чтение)
+  if (!currentUser.studyActivities || currentUser.studyActivities.length === 0) {
+    currentUser.studyActivities = JSON.parse(JSON.stringify(DEFAULT_STUDY_ACTIVITIES));
+  }
+  currentUser.studyActivities.forEach(st => {
+    if (!st.days || !Array.isArray(st.days) || st.days.length === 0) {
+      st.days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    }
+    if (!st.unit) st.unit = (st.type === 'sets' ? 'сессий' : 'задач');
+  });
+
+  if (!currentUser.studyLogs) {
+    currentUser.studyLogs = {};
+  }
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = {
+      status: 'pending',
+      activities: {},
+      scheduleDone: {},
+      scheduleSets: {}
+    };
+  }
+
+  // Ensure work/study slots in schedule have study exercises
+  if (currentUser.scheduleSlots) {
+    const studySlot = currentUser.scheduleSlots.find(s => s.category === 'work' && (!s.exercises || s.exercises.length === 0));
+    if (studySlot) {
+      studySlot.exercises = [
+        { name: 'ACCA: Разбор тем и задач', sets: 4, target: 10, unit: 'задач' }
+      ];
+    }
+    const readingSlot = currentUser.scheduleSlots.find(s => (s.id === 's9' || (s.name && s.name.toLowerCase().includes('чтение'))) && (!s.exercises || s.exercises.length === 0));
+    if (readingSlot) {
+      readingSlot.exercises = [
+        { name: 'Свободное чтение книг', sets: 1, target: 30, unit: 'стр' }
+      ];
+    }
+  }
+
   initUserExercises();
+  initUserStudyActivities();
   saveCurrentUser();
 }
 
@@ -235,7 +282,7 @@ function formatCurrencyUZS(amount) {
    ========================================================= */
 
 function switchView(viewId) {
-  const views = ['viewSchedule', 'viewPushups', 'viewPenalties', 'viewReport'];
+  const views = ['viewSchedule', 'viewStudy', 'viewPushups', 'viewPenalties', 'viewReport'];
   views.forEach(v => {
     const el = document.getElementById(v);
     if (el) {
@@ -261,6 +308,7 @@ function switchView(viewId) {
   });
 
   if (viewId === 'viewSchedule') renderSchedule();
+  if (viewId === 'viewStudy') renderStudy();
   if (viewId === 'viewPushups') renderPushups();
   if (viewId === 'viewPenalties') renderPenalties();
   if (viewId === 'viewReport') renderReport();
@@ -597,32 +645,48 @@ function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз
   row.className = 'slot-ex-row';
 
   const userExercises = (currentUser && currentUser.exercises) || DEFAULT_EXERCISES;
+  const userStudy = (currentUser && currentUser.studyActivities) || DEFAULT_STUDY_ACTIVITIES;
+
   let optionsHtml = `<option value="">-- Выберите из базы --</option>`;
   let matched = false;
 
+  optionsHtml += `<optgroup label="📚 Учёба и чтение">`;
+  userStudy.forEach(st => {
+    const isSelected = st.name === name;
+    if (isSelected) matched = true;
+    optionsHtml += `<option value="${escapeHtml(st.name)}" data-kind="study" ${isSelected ? 'selected' : ''}>${st.icon || '📚'} ${escapeHtml(st.name)}</option>`;
+  });
+  optionsHtml += `</optgroup>`;
+
+  optionsHtml += `<optgroup label="💪 Тренировка и спорт">`;
   userExercises.forEach(ex => {
     const isSelected = ex.name === name;
     if (isSelected) matched = true;
-    optionsHtml += `<option value="${escapeHtml(ex.name)}" ${isSelected ? 'selected' : ''}>${ex.icon || '🏋️'} ${escapeHtml(ex.name)}</option>`;
+    optionsHtml += `<option value="${escapeHtml(ex.name)}" data-kind="sport" ${isSelected ? 'selected' : ''}>${ex.icon || '🏋️'} ${escapeHtml(ex.name)}</option>`;
   });
+  optionsHtml += `</optgroup>`;
 
   if (name && !matched) {
     optionsHtml += `<option value="${escapeHtml(name)}" selected>✏️ ${escapeHtml(name)}</option>`;
   }
 
-  optionsHtml += `<option value="__new__">➕ Новое упражнение в базу...</option>`;
+  optionsHtml += `<option value="__new__">➕ Новое упражнение/предмет...</option>`;
   optionsHtml += `<option value="__custom__">✏️ Ввести другое вручную...</option>`;
 
   row.innerHTML = `
-    <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение из базы или создайте новое">
+    <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение или предмет из базы">
       ${optionsHtml}
     </select>
-    <input type="number" placeholder="Подх." min="1" max="100" value="${sets}" title="Количество подходов" class="ex-sets-input">
-    <input type="number" placeholder="Цель" min="1" max="1000" value="${target}" title="Повторений или секунд" class="ex-target-input">
+    <input type="number" placeholder="Подх." min="1" max="100" value="${sets}" title="Количество подходов / сессий" class="ex-sets-input">
+    <input type="number" placeholder="Цель" min="1" max="5000" value="${target}" title="Повторений, задач или страниц" class="ex-target-input">
     <select class="ex-unit-input" title="Единица измерения">
+      <option value="задач" ${unit === 'задач' ? 'selected' : ''}>задач</option>
+      <option value="стр" ${unit === 'стр' ? 'selected' : ''}>стр</option>
+      <option value="мин" ${unit === 'мин' ? 'selected' : ''}>мин</option>
       <option value="раз" ${unit === 'раз' ? 'selected' : ''}>раз</option>
       <option value="сек" ${unit === 'сек' ? 'selected' : ''}>сек</option>
-      <option value="мин" ${unit === 'мин' ? 'selected' : ''}>мин</option>
+      <option value="сессий" ${unit === 'сессий' ? 'selected' : ''}>сессий</option>
+      <option value="подх." ${unit === 'подх.' ? 'selected' : ''}>подх.</option>
     </select>
     <button type="button" class="slot-ex-delete-btn" onclick="this.parentElement.remove()" title="Удалить строку">✕</button>
   `;
@@ -635,7 +699,7 @@ function onSlotExerciseSelectChanged(selectEl) {
   if (!row) return;
 
   if (val === '__custom__') {
-    const customName = prompt('Введите название упражнения:');
+    const customName = prompt('Введите название упражнения или предмета:');
     if (customName && customName.trim()) {
       const opt = document.createElement('option');
       opt.value = customName.trim();
@@ -649,46 +713,70 @@ function onSlotExerciseSelectChanged(selectEl) {
   }
 
   if (val === '__new__') {
-    const newName = prompt('Добавить упражнение в базу тренировок.\n\nВведите название (например: Жим гантелей):');
+    const newName = prompt('Добавить в базу.\n\nВведите название (например: ACCA: Налоги или Жим гантелей):');
     if (newName && newName.trim()) {
       const trimmedName = newName.trim();
-      const isPlank = trimmedName.toLowerCase().includes('планк') || trimmedName.toLowerCase().includes('удержан');
-      const newEx = {
-        id: 'ex_' + Date.now(),
-        name: trimmedName,
-        icon: isPlank ? '⏱️' : '🏋️',
-        type: isPlank ? 'reps' : 'sets',
-        target: isPlank ? 60 : 4,
-        days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-      };
-      if (!currentUser.exercises) currentUser.exercises = [];
-      currentUser.exercises.push(newEx);
-      saveCurrentUser();
-      renderPushups();
+      const isStudy = trimmedName.toLowerCase().includes('acca') || trimmedName.toLowerCase().includes('чтени') || trimmedName.toLowerCase().includes('книг') || trimmedName.toLowerCase().includes('учеб');
+      if (isStudy) {
+        const newSt = {
+          id: 'study_' + Date.now(),
+          name: trimmedName,
+          icon: trimmedName.toLowerCase().includes('книг') || trimmedName.toLowerCase().includes('чтен') ? '📖' : '📑',
+          type: 'reps',
+          unit: trimmedName.toLowerCase().includes('книг') || trimmedName.toLowerCase().includes('чтен') ? 'стр' : 'задач',
+          target: 20,
+          days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        };
+        if (!currentUser.studyActivities) currentUser.studyActivities = [];
+        currentUser.studyActivities.push(newSt);
+        saveCurrentUser();
+        renderStudy();
+      } else {
+        const isPlank = trimmedName.toLowerCase().includes('планк') || trimmedName.toLowerCase().includes('удержан');
+        const newEx = {
+          id: 'ex_' + Date.now(),
+          name: trimmedName,
+          icon: isPlank ? '⏱️' : '🏋️',
+          type: isPlank ? 'reps' : 'sets',
+          target: isPlank ? 60 : 4,
+          days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        };
+        if (!currentUser.exercises) currentUser.exercises = [];
+        currentUser.exercises.push(newEx);
+        saveCurrentUser();
+        renderPushups();
+      }
       renderReport();
 
       const opt = document.createElement('option');
-      opt.value = newEx.name;
-      opt.textContent = `${newEx.icon} ${newEx.name}`;
+      opt.value = trimmedName;
+      opt.textContent = (isStudy ? '📚 ' : '🏋️ ') + trimmedName;
       opt.selected = true;
       selectEl.insertBefore(opt, selectEl.lastElementChild.previousElementSibling);
-
-      const setsInput = row.querySelector('.ex-sets-input');
-      const targetInput = row.querySelector('.ex-target-input');
-      const unitSelect = row.querySelector('.ex-unit-input');
-      if (newEx.type === 'sets') {
-        if (setsInput) setsInput.value = newEx.target;
-        if (targetInput) targetInput.value = 10;
-        if (unitSelect) unitSelect.value = 'раз';
-      } else {
-        if (setsInput) setsInput.value = 3;
-        if (targetInput) targetInput.value = newEx.target;
-        if (unitSelect) unitSelect.value = isPlank ? 'сек' : 'раз';
-      }
     } else {
       selectEl.value = '';
     }
     return;
+  }
+
+  // Check in study activities first
+  if (currentUser && currentUser.studyActivities) {
+    const matchedStudy = currentUser.studyActivities.find(s => s.name === val);
+    if (matchedStudy) {
+      const setsInput = row.querySelector('.ex-sets-input');
+      const targetInput = row.querySelector('.ex-target-input');
+      const unitSelect = row.querySelector('.ex-unit-input');
+      if (matchedStudy.type === 'sets') {
+        if (setsInput) setsInput.value = matchedStudy.target || 4;
+        if (targetInput) targetInput.value = 45;
+        if (unitSelect) unitSelect.value = 'мин';
+      } else {
+        if (setsInput) setsInput.value = matchedStudy.name.includes('ACCA') ? 4 : 1;
+        if (targetInput) targetInput.value = matchedStudy.name.includes('ACCA') ? 10 : (matchedStudy.target || 20);
+        if (unitSelect) unitSelect.value = matchedStudy.unit || 'задач';
+      }
+      return;
+    }
   }
 
   if (currentUser && currentUser.exercises) {
@@ -1632,6 +1720,7 @@ function renderReport() {
 
   // Render Today's Schedule Workout Execution vs Plan
   renderTodayWorkoutReport();
+  renderTodayStudyReport();
 
   // Render Category Breakdown
   const catListEl = document.getElementById('categoriesReportList');
@@ -2180,6 +2269,938 @@ function renderTodayWorkoutReport() {
       ${setsBreakdownHtml}
       <div class="today-rep-bar-bg" style="margin-top: 6px;">
         <div class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background-color: ${isCompleted ? 'var(--accent-green)' : (factDone > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+/* =========================================================
+   STUDY & READING MODULE (ACCA, Свободное чтение)
+   ========================================================= */
+
+let currentStudyFilterDay = 'today';
+
+function setStudyDayFilter(day) {
+  currentStudyFilterDay = day;
+  document.querySelectorAll('#viewStudy .day-filter-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(`studyFilterDay_${day}`);
+  if (activeBtn) activeBtn.classList.add('active');
+  renderStudy();
+}
+
+function initUserStudyActivities() {
+  if (!currentUser) return;
+  if (!currentUser.studyActivities || currentUser.studyActivities.length === 0) {
+    currentUser.studyActivities = JSON.parse(JSON.stringify(DEFAULT_STUDY_ACTIVITIES));
+  }
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = {
+      status: 'pending',
+      activities: {},
+      scheduleDone: {},
+      scheduleSets: {}
+    };
+  }
+  const todayStudyLog = currentUser.studyLogs[todayKey];
+  if (!todayStudyLog.activities) todayStudyLog.activities = {};
+
+  currentUser.studyActivities.forEach(act => {
+    if (!todayStudyLog.activities[act.id]) {
+      todayStudyLog.activities[act.id] = act.type === 'reps'
+        ? { done: 0, completed: false }
+        : { sets: [], completed: false };
+    }
+  });
+}
+
+function renderStudy() {
+  if (!currentUser) return;
+  initUserStudyActivities();
+  const todayKey = getTodayDateKey();
+  const todayStudyLog = currentUser.studyLogs[todayKey];
+
+  const currentDayIndex = new Date().getDay();
+  const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayDayCode = dayMap[currentDayIndex];
+
+  let visibleActivities = currentUser.studyActivities || [];
+  if (currentStudyFilterDay === 'today') {
+    visibleActivities = visibleActivities.filter(a => (a.days || []).includes(todayDayCode));
+  } else if (currentStudyFilterDay !== 'all') {
+    visibleActivities = visibleActivities.filter(a => (a.days || []).includes(currentStudyFilterDay));
+  }
+
+  const container = document.getElementById('studyActivitiesContainer');
+  if (container) {
+    container.innerHTML = '';
+    if (visibleActivities.length === 0) {
+      container.innerHTML = `
+        <div style="padding: 24px 14px; text-align: center; color: var(--text-dim); background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px dashed var(--border);">
+          <div style="font-size: 28px; margin-bottom: 6px;">📚</div>
+          <div style="font-size: 14px; font-weight: 700;">На этот день нет предметов в программе</div>
+          <div style="font-size: 12px; margin-top: 4px;">Нажмите «+ Предмет / Чтение», чтобы добавить!</div>
+        </div>
+      `;
+    } else {
+      visibleActivities.forEach(act => {
+        const actData = todayStudyLog.activities[act.id] || (act.type === 'reps' ? { done: 0, completed: false } : { sets: [], completed: false });
+        const card = document.createElement('div');
+        const isCompleted = actData.completed || false;
+        card.className = `exercise-card ${isCompleted ? 'completed' : ''}`;
+
+        const dayLabels = { mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб', sun: 'Вс' };
+        const dayChipsHtml = (act.days || []).map(d => `
+          <span class="ex-day-chip ${d === todayDayCode ? 'today-day' : ''}">${dayLabels[d] || d}</span>
+        `).join('');
+
+        let bodyHtml = '';
+        if (act.type === 'reps') {
+          const done = actData.done || 0;
+          const target = act.target || 20;
+          const unit = act.unit || 'задач';
+          const percent = target > 0 ? Math.min(100, Math.round((done / target) * 100)) : 0;
+          const remaining = Math.max(0, target - done);
+
+          const q1 = unit === 'стр' ? 10 : 5;
+          const q2 = unit === 'стр' ? 20 : 10;
+          const q3 = unit === 'стр' ? 30 : 20;
+
+          bodyHtml = `
+            <div class="progress-bar-bg" style="margin: 10px 0 6px 0;">
+              <div class="progress-bar-fill" style="width: ${percent}%; background: linear-gradient(90deg, #4f46e5, #06b6d4);"></div>
+            </div>
+            <div class="progress-status-row" style="margin-bottom: 8px;">
+              <span>${isCompleted ? '✓ Выполнено!' : `Осталось: ${remaining} ${unit}`}</span>
+              <span>${percent}%</span>
+            </div>
+            <div class="quick-add-grid">
+              <button class="rep-btn" onclick="addVolumeToStudyActivity('${act.id}', ${q1})">+${q1}</button>
+              <button class="rep-btn" onclick="addVolumeToStudyActivity('${act.id}', ${q2})">+${q2}</button>
+              <button class="rep-btn" onclick="addVolumeToStudyActivity('${act.id}', ${q3})">+${q3}</button>
+              <button class="rep-btn" onclick="completeStudyActivity('${act.id}')">Завершить 🎯</button>
+            </div>
+          `;
+        } else {
+          const sets = actData.sets || [];
+          const setsHtml = sets.length > 0
+            ? sets.map((s, idx) => `
+                <div class="set-chip">
+                  <span class="set-num">#${idx + 1}</span>
+                  <span>${s.duration || 45} мин • ${s.volume || 10} ${act.unit || 'задач'}</span>
+                  <span class="set-chip-delete" onclick="deleteStudySet('${act.id}', ${idx})">✕</span>
+                </div>
+              `).join('')
+            : '<div style="font-size: 12px; color: var(--text-dim);">Сессии пока не записаны</div>';
+
+          bodyHtml = `
+            <div class="sets-chips-list">
+              ${setsHtml}
+            </div>
+            <div class="ex-card-actions">
+              <button class="add-set-trigger-btn" onclick="openAddStudySetModal('${act.id}', '${escapeHtml(act.name)}')">
+                + Записать сессию (${sets.length}/${act.target})
+              </button>
+              <button class="quick-done-check-btn ${isCompleted ? 'done' : ''}" onclick="toggleStudyActivityCompleted('${act.id}')">
+                ${isCompleted ? '✓ Сделано' : 'Завершить'}
+              </button>
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div class="ex-header">
+            <div class="ex-title-wrap">
+              <div class="ex-icon">${act.icon || '📚'}</div>
+              <div>
+                <div class="ex-name">${escapeHtml(act.name)}</div>
+                <div class="ex-meta">Цель: ${act.target} ${act.unit || 'задач'}</div>
+                <div class="ex-days-row">
+                  <span class="ex-days-label">Дни:</span>
+                  ${dayChipsHtml}
+                </div>
+              </div>
+            </div>
+            <div class="ex-actions-top">
+              <button class="ex-btn-icon" title="Изменить цель" onclick="openChangeTargetModalStudy('${act.id}', ${act.target}, '${escapeHtml(act.unit || '')}')">✏️</button>
+              <button class="ex-btn-icon" title="Удалить" onclick="deleteStudyActivity('${act.id}')">🗑️</button>
+            </div>
+          </div>
+          ${bodyHtml}
+        `;
+        container.appendChild(card);
+      });
+    }
+  }
+
+  // Calculate totals and verdict
+  let completedCount = 0;
+  let totalVolumeToday = 0;
+  visibleActivities.forEach(a => {
+    const actData = todayStudyLog.activities[a.id];
+    if (actData && actData.completed) completedCount++;
+    if (actData) {
+      if (a.type === 'reps') totalVolumeToday += (actData.done || 0);
+      else if (actData.sets) totalVolumeToday += actData.sets.reduce((s, x) => s + (parseInt(x.volume, 10) || 0), 0);
+    }
+  });
+
+  const actDoneEl = document.getElementById('studyActivitiesDone');
+  if (actDoneEl) actDoneEl.textContent = `${completedCount}/${visibleActivities.length}`;
+
+  const streakEl = document.getElementById('studyStreakCount');
+  if (streakEl) streakEl.textContent = currentUser.studyStreak || 0;
+
+  const totalVolEl = document.getElementById('studyTotalDoneToday');
+  if (totalVolEl) totalVolEl.textContent = totalVolumeToday;
+
+  const verdictBox = document.getElementById('studyVerdictBox');
+  const isAllDone = visibleActivities.length > 0 && completedCount === visibleActivities.length;
+  if (verdictBox) {
+    if (isAllDone || todayStudyLog.status === 'success') {
+      todayStudyLog.status = 'success';
+      verdictBox.className = 'day-verdict-box verdict-success';
+      verdictBox.innerHTML = `
+        <div>🎯 ПРОГРАММА УЧЁБЫ НА СЕГОДНЯ ВЫПОЛНЕНА!</div>
+        <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
+          Отличная инвестиция в мозг и карьеру! Так держать!
+        </div>
+      `;
+    } else {
+      todayStudyLog.status = 'pending';
+      verdictBox.className = 'day-verdict-box';
+      verdictBox.innerHTML = `
+        <div>📖 УЧЁБА В ПРОЦЕССЕ (${completedCount}/${visibleActivities.length})</div>
+        <div style="font-size: 12px; font-weight: 500; opacity: 0.9;">
+          Закрой плановые задачи по ACCA и чтению сегодня!
+        </div>
+      `;
+    }
+  }
+
+  saveCurrentUser();
+  renderStudyHistory();
+  renderScheduleStudyComparison();
+}
+
+function addVolumeToStudyActivity(actId, count) {
+  if (!currentUser) return;
+  initUserStudyActivities();
+  const todayKey = getTodayDateKey();
+  const actData = currentUser.studyLogs[todayKey].activities[actId];
+  if (!actData) return;
+  actData.done = (actData.done || 0) + count;
+  const act = (currentUser.studyActivities || []).find(a => a.id === actId);
+  if (act && actData.done >= act.target) {
+    actData.completed = true;
+  }
+  playHapticSound('rep');
+  saveCurrentUser();
+  renderStudy();
+  renderReport();
+}
+
+function completeStudyActivity(actId) {
+  if (!currentUser) return;
+  initUserStudyActivities();
+  const todayKey = getTodayDateKey();
+  const act = (currentUser.studyActivities || []).find(a => a.id === actId);
+  const actData = currentUser.studyLogs[todayKey].activities[actId];
+  if (!actData || !act) return;
+  actData.done = Math.max(actData.done || 0, act.target);
+  actData.completed = true;
+  playHapticSound('success');
+  saveCurrentUser();
+  renderStudy();
+  renderReport();
+}
+
+function completeFullStudyToday() {
+  if (!currentUser) return;
+  initUserStudyActivities();
+  const todayKey = getTodayDateKey();
+  const todayStudyLog = currentUser.studyLogs[todayKey];
+  (currentUser.studyActivities || []).forEach(act => {
+    const actData = todayStudyLog.activities[act.id];
+    if (actData) {
+      if (act.type === 'reps') actData.done = Math.max(actData.done || 0, act.target);
+      actData.completed = true;
+    }
+  });
+  todayStudyLog.status = 'success';
+  currentUser.studyStreak = (currentUser.studyStreak || 0) + 1;
+  playHapticSound('success');
+  saveCurrentUser();
+  renderStudy();
+  renderReport();
+  alert('🎓 Поздравляем! Вся программа учёбы и чтения на сегодня выполнена на 100%!');
+}
+
+function toggleStudyActivityCompleted(actId) {
+  if (!currentUser) return;
+  initUserStudyActivities();
+  const todayKey = getTodayDateKey();
+  const actData = currentUser.studyLogs[todayKey].activities[actId];
+  if (!actData) return;
+  actData.completed = !actData.completed;
+  saveCurrentUser();
+  renderStudy();
+  renderReport();
+}
+
+function openAddStudyModal() {
+  document.getElementById('studyForm').reset();
+  document.getElementById('studyModal').classList.remove('hidden');
+}
+
+function closeStudyModal() {
+  document.getElementById('studyModal').classList.add('hidden');
+}
+
+function saveCustomStudyActivity(e) {
+  e.preventDefault();
+  const name = document.getElementById('newStudyName').value.trim();
+  const icon = document.getElementById('newStudyIcon').value;
+  const unit = document.getElementById('newStudyUnit').value;
+  const type = document.getElementById('newStudyType').value;
+  const target = parseInt(document.getElementById('newStudyTarget').value, 10) || 20;
+
+  const selectedDays = [];
+  document.querySelectorAll('#newStudyDaysGrid input:checked').forEach(cb => {
+    selectedDays.push(cb.value);
+  });
+
+  if (!name) return;
+
+  const newAct = {
+    id: 'study_' + Date.now(),
+    name,
+    icon,
+    unit,
+    type,
+    target,
+    days: selectedDays.length > 0 ? selectedDays : ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+  };
+
+  if (!currentUser.studyActivities) currentUser.studyActivities = [];
+  currentUser.studyActivities.push(newAct);
+  saveCurrentUser();
+  closeStudyModal();
+  renderStudy();
+  renderReport();
+}
+
+function deleteStudyActivity(actId) {
+  if (!currentUser) return;
+  if (confirm('Удалить этот предмет / чтение из программы?')) {
+    currentUser.studyActivities = (currentUser.studyActivities || []).filter(a => a.id !== actId);
+    saveCurrentUser();
+    renderStudy();
+    renderReport();
+  }
+}
+
+function openChangeTargetModalStudy(actId, curTarget, unit) {
+  document.getElementById('editStudyActivityId').value = actId;
+  document.getElementById('newStudyTargetInput').value = curTarget || 20;
+  const lbl = document.getElementById('studyTargetModalLabel');
+  if (lbl) lbl.textContent = `Цель на день (${unit || 'задач / стр'})`;
+  document.getElementById('studyTargetModal').classList.remove('hidden');
+}
+
+function closeStudyTargetModal() {
+  document.getElementById('studyTargetModal').classList.add('hidden');
+}
+
+function saveNewStudyTarget(e) {
+  e.preventDefault();
+  const actId = document.getElementById('editStudyActivityId').value;
+  const val = parseInt(document.getElementById('newStudyTargetInput').value, 10);
+  if (val >= 1) {
+    const act = (currentUser.studyActivities || []).find(a => a.id === actId);
+    if (act) act.target = val;
+    saveCurrentUser();
+    closeStudyTargetModal();
+    renderStudy();
+    renderReport();
+  }
+}
+
+function openAddStudySetModal(actId, actName) {
+  document.getElementById('studySetActivityId').value = actId;
+  const titleEl = document.getElementById('studySetModalTitle');
+  if (titleEl) titleEl.textContent = `Сессия: ${actName}`;
+  document.getElementById('studySetModal').classList.remove('hidden');
+}
+
+function closeStudySetModal() {
+  document.getElementById('studySetModal').classList.add('hidden');
+}
+
+function saveStudySet(e) {
+  e.preventDefault();
+  const actId = document.getElementById('studySetActivityId').value;
+  const duration = parseInt(document.getElementById('studySetDurationInput').value, 10) || 45;
+  const volume = parseInt(document.getElementById('studySetVolumeInput').value, 10) || 10;
+
+  const todayKey = getTodayDateKey();
+  initUserStudyActivities();
+  const actData = currentUser.studyLogs[todayKey].activities[actId];
+  const act = (currentUser.studyActivities || []).find(a => a.id === actId);
+  if (actData && act) {
+    if (!actData.sets) actData.sets = [];
+    actData.sets.push({ duration, volume });
+    if (actData.sets.length >= act.target) {
+      actData.completed = true;
+    }
+    saveCurrentUser();
+    closeStudySetModal();
+    renderStudy();
+    renderReport();
+  }
+}
+
+function deleteStudySet(actId, setIdx) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  initUserStudyActivities();
+  const actData = currentUser.studyLogs[todayKey].activities[actId];
+  if (actData && actData.sets) {
+    actData.sets.splice(setIdx, 1);
+    const act = (currentUser.studyActivities || []).find(a => a.id === actId);
+    if (act && actData.sets.length < act.target) {
+      actData.completed = false;
+    }
+    saveCurrentUser();
+    renderStudy();
+    renderReport();
+  }
+}
+
+function renderStudyHistory() {
+  const container = document.getElementById('studyHistoryList');
+  if (!container || !currentUser || !currentUser.studyLogs) return;
+  container.innerHTML = '';
+
+  const daysToShow = 7;
+  const dates = [];
+  const now = new Date();
+  for (let i = 0; i < daysToShow; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    dates.push(formatDateKey(d));
+  }
+
+  dates.forEach(dateKey => {
+    const log = currentUser.studyLogs[dateKey];
+    const isToday = dateKey === getTodayDateKey();
+    const dateObj = new Date(dateKey);
+    const dateTitle = isToday ? 'Сегодня' : dateObj.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+
+    let isSuccess = log && log.status === 'success';
+    let summaryText = 'Нет данных';
+
+    if (log && log.activities) {
+      const parts = [];
+      Object.keys(log.activities).forEach(actId => {
+        const act = (currentUser.studyActivities || []).find(a => a.id === actId);
+        const data = log.activities[actId];
+        if (act && data) {
+          if (act.type === 'reps' && data.done > 0) {
+            parts.push(`${act.icon || '📚'} ${data.done} ${act.unit || 'задач'}`);
+          } else if (act.type === 'sets' && data.sets && data.sets.length > 0) {
+            parts.push(`${act.icon || '⏱️'} ${data.sets.length} сессий`);
+          }
+        }
+      });
+      if (parts.length > 0) summaryText = parts.join(' • ');
+    }
+
+    const row = document.createElement('div');
+    row.className = 'history-item';
+    row.innerHTML = `
+      <div>
+        <div class="hist-date">${dateTitle} ${isToday ? '⭐' : ''}</div>
+        <div class="hist-reps">${summaryText}</div>
+      </div>
+      <div>
+        <span class="hist-status ${isSuccess ? 'success' : 'fail'}">
+          ${isSuccess ? '✓ Закрыто' : 'Пропущено'}
+        </span>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function getScheduleStudyExercises() {
+  if (!currentUser || !currentUser.scheduleSlots) return [];
+  const studySlots = currentUser.scheduleSlots.filter(s => s.category === 'work');
+  const result = [];
+  studySlots.forEach(slot => {
+    const exs = slot.exercises || [];
+    exs.forEach(ex => {
+      const sets = parseInt(ex.sets, 10) || 1;
+      const target = parseInt(ex.target, 10) || 10;
+      const unit = ex.unit || 'задач';
+      const isCountUnit = unit === 'задач' || unit === 'стр' || unit === 'мин' || unit === 'раз' || unit === 'сек' || unit === 'глав';
+      const totalPlan = isCountUnit ? (sets * target) : sets;
+
+      result.push({
+        slotId: slot.id,
+        slotName: slot.name,
+        slotTime: `${slot.start} - ${slot.end}`,
+        name: ex.name,
+        sets,
+        target,
+        unit,
+        totalPlan
+      });
+    });
+  });
+  return result;
+}
+
+function renderScheduleStudyComparison() {
+  const container = document.getElementById('scheduleStudyComparisonList');
+  if (!container || !currentUser) return;
+  container.innerHTML = '';
+
+  const studyExercises = getScheduleStudyExercises();
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = { status: 'pending', activities: {}, scheduleDone: {}, scheduleSets: {} };
+  }
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+
+  if (studyExercises.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 20px 14px; text-align: center; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px dashed var(--border);">
+        <div style="font-size: 26px; margin-bottom: 6px;">📖</div>
+        <div style="font-size: 14px; font-weight: 700;">В блоках учёты пока нет заданий</div>
+        <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">
+          Откройте вкладку «Расписание», нажмите на блок категории «Работа / Учёба» и добавьте задания по ACCA или чтению!
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  studyExercises.forEach((item, exIdx) => {
+    const key = item.name;
+    const cardId = 'sc_study_' + exIdx + '_' + (item.slotId || 'slot');
+
+    let setsArr = todayLog.scheduleSets[key];
+    if (!Array.isArray(setsArr)) {
+      const count = Math.max(1, item.sets || 1);
+      setsArr = [];
+      const prevDone = todayLog.scheduleDone[key];
+      if (prevDone !== undefined && prevDone > 0) {
+        if (prevDone === item.totalPlan && item.sets > 0) {
+          for (let i = 0; i < count; i++) setsArr.push(item.target);
+        } else {
+          let rem = prevDone;
+          for (let i = 0; i < count; i++) {
+            const val = Math.min(item.target, rem);
+            setsArr.push(val);
+            rem -= val;
+          }
+          if (rem > 0 && setsArr.length > 0) setsArr[setsArr.length - 1] += rem;
+        }
+      } else {
+        for (let i = 0; i < count; i++) setsArr.push(0);
+      }
+      todayLog.scheduleSets[key] = setsArr;
+    }
+
+    while (setsArr.length < item.sets) {
+      setsArr.push(0);
+    }
+
+    const totalFact = setsArr.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+    todayLog.scheduleDone[key] = totalFact;
+
+    const totalPlan = item.totalPlan;
+    const diff = totalFact - totalPlan;
+    const isCompleted = totalFact >= totalPlan;
+    const pct = totalPlan > 0 ? Math.round((totalFact / totalPlan) * 100) : 0;
+
+    let diffBadgeHtml = '';
+    if (diff < 0) {
+      const remaining = Math.abs(diff);
+      diffBadgeHtml = `<span class="diff-badge diff-remaining">Осталось: ${remaining} ${item.unit} (${pct}%) ⏳</span>`;
+    } else if (diff === 0) {
+      diffBadgeHtml = `<span class="diff-badge diff-exact">✓ Выполнено в точности (100%) 🎯</span>`;
+    } else {
+      diffBadgeHtml = `<span class="diff-badge diff-over">Перевыполнено: +${diff} ${item.unit} (${pct}%) 🔥</span>`;
+    }
+
+    const stepDelta = (item.unit === 'мин' ? 15 : (item.unit === 'стр' ? 5 : 1));
+    const setsRowsHtml = setsArr.map((val, sIdx) => {
+      const setNumber = sIdx + 1;
+      const isTargetHit = (val === item.target && val > 0);
+      const isOverHit = (val > item.target);
+      const canDelete = setsArr.length > item.sets;
+
+      return `
+        <div class="sched-set-row ${isTargetHit ? 'set-hit' : (isOverHit ? 'set-over' : '')}">
+          <div class="sched-set-label-wrap">
+            <span class="sched-set-badge">${setNumber}-я сессия</span>
+            ${isTargetHit ? '<span class="sched-set-status-hit" title="Норма выполнена!">✓</span>' : (isOverHit ? '<span class="sched-set-status-over" title="Перевыполнено!">🔥</span>' : '')}
+          </div>
+
+          <div class="sched-set-controls">
+            <button type="button" class="sched-set-step-btn" title="Уменьшить" onclick="stepScheduleStudySetVal('${escapeHtml(item.name)}', ${sIdx}, -${stepDelta})">−</button>
+            <input type="number" 
+                   class="sched-set-input" 
+                   value="${val}" 
+                   min="0" 
+                   onfocus="this.select()"
+                   oninput="handleScheduleStudySetInput(this, '${escapeHtml(item.name)}', ${sIdx}, ${totalPlan}, '${item.unit}', '${cardId}')"
+                   onchange="setScheduleStudySetVal('${escapeHtml(item.name)}', ${sIdx}, this.value)">
+            <button type="button" class="sched-set-step-btn" title="Увеличить" onclick="stepScheduleStudySetVal('${escapeHtml(item.name)}', ${sIdx}, ${stepDelta})">+</button>
+            <button type="button" class="sched-set-target-btn" title="Поставить план ${item.target} ${item.unit}" onclick="setScheduleStudySetVal('${escapeHtml(item.name)}', ${sIdx}, ${item.target})">=${item.target}</button>
+            <span class="sched-set-unit">${item.unit}</span>
+            ${canDelete ? `
+              <button type="button" class="sched-set-del-btn" title="Удалить сессию" onclick="removeScheduleStudySet('${escapeHtml(item.name)}', ${sIdx})">✕</button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const card = document.createElement('div');
+    card.className = `schedule-comparison-item ${isCompleted ? 'completed' : ''}`;
+    card.id = `sched-card-${cardId}`;
+    card.innerHTML = `
+      <div class="sched-comp-top">
+        <div>
+          <div class="sched-comp-title">
+            <span>📚</span>
+            <span>${escapeHtml(item.name)}</span>
+          </div>
+          <div class="sched-comp-slot-tag">Блок расписания: ${escapeHtml(item.slotName)} (${item.slotTime})</div>
+        </div>
+        <div id="sched-badge-${cardId}">
+          ${diffBadgeHtml}
+        </div>
+      </div>
+
+      <div class="sched-comp-grid">
+        <div class="sched-comp-col">
+          <span class="sched-comp-col-label">План из расписания</span>
+          <span class="sched-comp-plan-val">${item.sets} сессий × ${item.target} ${item.unit} <b>(= ${totalPlan} ${item.unit})</b></span>
+        </div>
+
+        <div class="sched-comp-col">
+          <span class="sched-comp-col-label">Факт (сумма сессий)</span>
+          <div class="sched-comp-fact-total" id="sched-fact-${cardId}">
+            <b>${totalFact}</b> ${item.unit}
+          </div>
+        </div>
+
+        <div class="sched-comp-col">
+          <span class="sched-comp-col-label">Разница (Факт − План)</span>
+          <div id="sched-diff-${cardId}" style="font-size: 14px; font-weight: 800; color: ${diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)'}">
+            ${diff > 0 ? `+${diff}` : diff} ${item.unit}
+          </div>
+        </div>
+      </div>
+
+      <div class="today-rep-bar-bg" style="margin-top: 8px;">
+        <div id="sched-bar-${cardId}" class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background: ${isCompleted ? 'var(--accent-green)' : (totalFact > 0 ? 'linear-gradient(90deg, #4f46e5, #06b6d4)' : 'rgba(255,255,255,0.2)')};"></div>
+      </div>
+
+      <div class="sched-sets-breakdown-box">
+        <div class="sched-sets-header">
+          <div class="sched-sets-header-title">
+            <span>⏱️ По учебным сессиям (план: ${item.sets} по ${item.target} ${item.unit}):</span>
+          </div>
+          <div class="sched-sets-header-actions">
+            <button type="button" class="sched-quick-action-btn" title="Заполнить все сессии плановым количеством" onclick="fillScheduleStudySetsWithTarget('${escapeHtml(item.name)}', ${item.target})">
+              ⚡ Все по ${item.target}
+            </button>
+            <button type="button" class="sched-quick-action-btn add-btn" title="Добавить еще одну сессию" onclick="addScheduleExtraStudySet('${escapeHtml(item.name)}')">
+              + Сессия
+            </button>
+          </div>
+        </div>
+
+        <div class="sched-sets-grid">
+          ${setsRowsHtml}
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function handleScheduleStudySetInput(inputEl, exName, setIndex, totalPlan, unit, cardId) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = { status: 'pending', activities: {}, scheduleDone: {}, scheduleSets: {} };
+  }
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  while (todayLog.scheduleSets[exName].length <= setIndex) todayLog.scheduleSets[exName].push(0);
+
+  const num = Math.max(0, parseInt(inputEl.value, 10) || 0);
+  todayLog.scheduleSets[exName][setIndex] = num;
+
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+
+  // Live update card DOM
+  const factEl = document.getElementById(`sched-fact-${cardId}`);
+  if (factEl) factEl.innerHTML = `<b>${totalFact}</b> ${unit}`;
+
+  const diff = totalFact - totalPlan;
+  const diffEl = document.getElementById(`sched-diff-${cardId}`);
+  if (diffEl) {
+    diffEl.textContent = `${diff > 0 ? '+' + diff : diff} ${unit}`;
+    diffEl.style.color = diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)';
+  }
+
+  const pct = totalPlan > 0 ? Math.round((totalFact / totalPlan) * 100) : 0;
+  const isCompleted = totalFact >= totalPlan;
+
+  const badgeEl = document.getElementById(`sched-badge-${cardId}`);
+  if (badgeEl) {
+    if (diff < 0) {
+      badgeEl.innerHTML = `<span class="diff-badge diff-remaining">Осталось: ${Math.abs(diff)} ${unit} (${pct}%) ⏳</span>`;
+    } else if (diff === 0) {
+      badgeEl.innerHTML = `<span class="diff-badge diff-exact">✓ Выполнено в точности (100%) 🎯</span>`;
+    } else {
+      badgeEl.innerHTML = `<span class="diff-badge diff-over">Перевыполнено: +${diff} ${unit} (${pct}%) 🔥</span>`;
+    }
+  }
+
+  const barEl = document.getElementById(`sched-bar-${cardId}`);
+  if (barEl) {
+    barEl.style.width = `${Math.min(100, pct)}%`;
+    barEl.style.background = isCompleted ? 'var(--accent-green)' : (totalFact > 0 ? 'linear-gradient(90deg, #4f46e5, #06b6d4)' : 'rgba(255,255,255,0.2)');
+  }
+
+  const cardEl = document.getElementById(`sched-card-${cardId}`);
+  if (cardEl) {
+    if (isCompleted) cardEl.classList.add('completed');
+    else cardEl.classList.remove('completed');
+  }
+
+  syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+}
+
+function setScheduleStudySetVal(exName, setIndex, val) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = { status: 'pending', activities: {}, scheduleDone: {}, scheduleSets: {} };
+  }
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  while (todayLog.scheduleSets[exName].length <= setIndex) todayLog.scheduleSets[exName].push(0);
+
+  const num = Math.max(0, parseInt(val, 10) || 0);
+  todayLog.scheduleSets[exName][setIndex] = num;
+
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+
+  syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+  renderScheduleStudyComparison();
+  renderStudy();
+  renderTodayStudyReport();
+}
+
+function stepScheduleStudySetVal(exName, setIndex, delta) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  if (!currentUser.studyLogs[todayKey]) {
+    currentUser.studyLogs[todayKey] = { status: 'pending', activities: {}, scheduleDone: {}, scheduleSets: {} };
+  }
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  while (todayLog.scheduleSets[exName].length <= setIndex) todayLog.scheduleSets[exName].push(0);
+
+  const cur = parseInt(todayLog.scheduleSets[exName][setIndex], 10) || 0;
+  const next = Math.max(0, cur + delta);
+  setScheduleStudySetVal(exName, setIndex, next);
+}
+
+function fillScheduleStudySetsWithTarget(exName, targetVal) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  for (let i = 0; i < todayLog.scheduleSets[exName].length; i++) {
+    todayLog.scheduleSets[exName][i] = targetVal;
+  }
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+  syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+  renderScheduleStudyComparison();
+  renderStudy();
+  renderTodayStudyReport();
+}
+
+function addScheduleExtraStudySet(exName) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  todayLog.scheduleSets[exName].push(0);
+  saveCurrentUser();
+  renderScheduleStudyComparison();
+  renderTodayStudyReport();
+}
+
+function removeScheduleStudySet(exName, setIndex) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.studyLogs) currentUser.studyLogs = {};
+  const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.scheduleSets || !Array.isArray(todayLog.scheduleSets[exName])) return;
+  todayLog.scheduleSets[exName].splice(setIndex, 1);
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+  syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+  renderScheduleStudyComparison();
+  renderStudy();
+  renderTodayStudyReport();
+}
+
+function syncScheduleStudyWithCatalog(exName, totalFact, setsArray) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  initUserStudyActivities();
+  const todayLog = currentUser.studyLogs[todayKey];
+
+  const matchedAct = (currentUser.studyActivities || []).find(a => a.name.toLowerCase() === exName.toLowerCase());
+  if (matchedAct) {
+    if (!todayLog.activities[matchedAct.id]) {
+      todayLog.activities[matchedAct.id] = (matchedAct.type === 'sets' ? { sets: [], completed: false } : { done: 0, completed: false });
+    }
+    const actData = todayLog.activities[matchedAct.id];
+    if (matchedAct.type === 'sets') {
+      const existingSets = actData.sets || [];
+      actData.sets = (setsArray || []).map((val, i) => ({
+        duration: (existingSets[i] && existingSets[i].duration !== undefined) ? existingSets[i].duration : 45,
+        volume: val
+      }));
+      actData.completed = (totalFact >= (matchedAct.target || 1));
+    } else {
+      actData.done = totalFact;
+      actData.completed = (totalFact >= (matchedAct.target || 1));
+    }
+  }
+}
+
+function renderTodayStudyReport() {
+  const container = document.getElementById('todayStudyReportList');
+  if (!container || !currentUser) return;
+  container.innerHTML = '';
+
+  const todayKey = getTodayDateKey();
+  const todayLog = (currentUser.studyLogs && currentUser.studyLogs[todayKey]) || { activities: {}, scheduleDone: {}, scheduleSets: {} };
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+
+  const studyExercises = getScheduleStudyExercises();
+
+  const todaySub = document.getElementById('studyTodaySubtitle');
+  if (todaySub) {
+    todaySub.textContent = `План из расписания на ${new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}`;
+  }
+
+  if (studyExercises.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">
+        В блоках категории «Работа / Учёба» на сегодня нет заданий.
+      </div>
+    `;
+    return;
+  }
+
+  studyExercises.forEach(item => {
+    let factDone = todayLog.scheduleDone[item.name];
+    if (factDone === undefined) {
+      const matchedAct = (currentUser.studyActivities || []).find(a => a.name.toLowerCase() === item.name.toLowerCase());
+      if (matchedAct && todayLog.activities && todayLog.activities[matchedAct.id]) {
+        const actData = todayLog.activities[matchedAct.id];
+        factDone = matchedAct.type === 'sets' ? ((actData.sets && actData.sets.length) || 0) : (actData.done || 0);
+      } else {
+        factDone = 0;
+      }
+    }
+
+    const totalPlan = item.totalPlan;
+    const diff = factDone - totalPlan;
+    const isCompleted = factDone >= totalPlan;
+    const pct = totalPlan > 0 ? Math.round((factDone / totalPlan) * 100) : 0;
+
+    let badgeHtml = '';
+    if (diff < 0) {
+      badgeHtml = `<span class="rep-badge in-progress">Осталось: ${Math.abs(diff)} ${item.unit} (${pct}%)</span>`;
+    } else if (diff === 0) {
+      badgeHtml = `<span class="rep-badge done">✓ Выполнено в точности (100%)</span>`;
+    } else {
+      badgeHtml = `<span class="rep-badge done">🔥 Перевыполнено (+${diff} ${item.unit})</span>`;
+    }
+
+    let setsBreakdownHtml = '';
+    if (todayLog.scheduleSets && Array.isArray(todayLog.scheduleSets[item.name]) && todayLog.scheduleSets[item.name].length > 0) {
+      const chips = todayLog.scheduleSets[item.name].map((sVal, idx) => {
+        return `<span class="report-set-chip">${idx + 1}-я: <b>${sVal}</b></span>`;
+      }).join(' ');
+      setsBreakdownHtml = `
+        <div class="report-sets-breakdown">
+          <span style="font-size: 11px; color: var(--text-dim); margin-right: 4px; align-self: center;">По сессиям:</span>
+          ${chips}
+        </div>
+      `;
+    }
+
+    const row = document.createElement('div');
+    row.className = `today-workout-report-item ${isCompleted ? 'done' : ''}`;
+    row.innerHTML = `
+      <div class="today-rep-top">
+        <div class="today-rep-name">
+          <span>📚</span>
+          <span>${escapeHtml(item.name)}</span>
+          <span style="font-size: 11px; font-weight: 500; color: var(--text-dim);">(${escapeHtml(item.slotName)})</span>
+        </div>
+        ${badgeHtml}
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px; flex-wrap: wrap; gap: 4px;">
+        <span style="color: #a5b4fc;">План: <b>${item.sets} сессий × ${item.target} ${item.unit} (${totalPlan} ${item.unit})</b></span>
+        <span>Факт: <b>${factDone} ${item.unit}</b> (Разница: <b style="color: ${diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)'}">${diff > 0 ? `+${diff}` : diff}</b>)</span>
+      </div>
+      ${setsBreakdownHtml}
+      <div class="today-rep-bar-bg" style="margin-top: 6px;">
+        <div class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background: ${isCompleted ? 'var(--accent-green)' : (factDone > 0 ? 'linear-gradient(90deg, #4f46e5, #06b6d4)' : 'rgba(255,255,255,0.2)')};"></div>
       </div>
     `;
     container.appendChild(row);
