@@ -1,17 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e1b4b"/>
-      <stop offset="50%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#090d16"/>
+      <stop offset="0%" stop-color="#141a2c"/>
+      <stop offset="50%" stop-color="#0c101d"/>
+      <stop offset="100%" stop-color="#070a12"/>
     </linearGradient>
-    <linearGradient id="fireGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <radialGradient id="goldGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#070a12" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff28c"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="goldRight" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#f59e0b"/>
-      <stop offset="50%" stop-color="#f43f5e"/>
-      <stop offset="100%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#b45309"/>
     </linearGradient>
+    <filter id="glowFilter" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
   <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4"/>
-  <text x="256" y="320" font-size="220" text-anchor="middle" dominant-baseline="central">🔥</text>
+  <circle cx="256" cy="256" r="210" fill="url(#goldGlow)"/>
+  <rect x="18" y="18" width="476" height="476" rx="112" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4"/>
+  
+  <!-- Glowing 3D Golden Lightning Bolt -->
+  <g filter="url(#glowFilter)">
+    <polygon points="292,65 155,265 242,265 215,445 358,215 270,215" fill="#f59e0b" opacity="0.4"/>
+    <polygon points="292,65 155,265 242,265 215,445 275,240" fill="url(#goldLeft)"/>
+    <polygon points="292,65 275,240 215,445 358,215 270,215" fill="url(#goldRight)"/>
+    <polyline points="292,65 275,240 215,445" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round"/>
+    <polygon points="292,65 155,265 242,265 215,445 358,215 270,215" fill="none" stroke="#ffeb82" stroke-width="2" stroke-linejoin="round"/>
+  </g>
 </svg>
