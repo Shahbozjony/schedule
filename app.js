@@ -128,6 +128,7 @@ function createDefaultUserProfile(name, username, password) {
     createdAt: new Date().toISOString(),
     streak: 0,
     coins: 0,
+    isPrivate: false,
     inventory: [],
     equippedFont: '',
     equippedBadge: '',
@@ -361,6 +362,7 @@ function ensureUserDefaults() {
   if (!currentUser.inventory) currentUser.inventory = [];
   if (!currentUser.equippedFont) currentUser.equippedFont = '';
   if (!currentUser.equippedBadge) currentUser.equippedBadge = '';
+  if (currentUser.isPrivate === undefined) currentUser.isPrivate = false;
   if (!currentUser.unlockedAchievementsHistory) currentUser.unlockedAchievementsHistory = [];
 
   // MIGRATION v33: Reset schedule slots >= 2026-11-09, reset coins to 0 and achievements to 0/18
@@ -970,6 +972,73 @@ function renderUserProfile() {
   if (confirmEl) confirmEl.value = '';
   const secErr = document.getElementById('profileSecurityError');
   if (secErr) secErr.classList.add('hidden');
+
+  // Populate Privacy Mode switch & badge
+  const privacyToggle = document.getElementById('privacyToggleCheckbox');
+  if (privacyToggle) privacyToggle.checked = !!currentUser.isPrivate;
+  const privacyBadge = document.getElementById('privacyStatusBadge');
+  if (privacyBadge) {
+    if (currentUser.isPrivate) {
+      privacyBadge.textContent = 'Вкл 🌫️';
+      privacyBadge.className = 'privacy-status-pill active';
+    } else {
+      privacyBadge.textContent = 'Выкл';
+      privacyBadge.className = 'privacy-status-pill';
+    }
+  }
+}
+
+function togglePrivacyMode(isChecked) {
+  if (!currentUser) return;
+  currentUser.isPrivate = !!isChecked;
+  saveCurrentUser();
+  renderUserProfile();
+  renderLeaderboard();
+  playHapticSound('toggle');
+}
+
+function confirmDeleteAccount() {
+  if (!currentUser) return;
+  const username = currentUser.username || '';
+  const displayName = currentUser.name || username;
+
+  const firstConfirm = confirm(`⚠️ ВНИМАНИЕ: Вы действительно хотите НАВСЕГДА удалить аккаунт @${username} (${displayName})?\n\nВсе ваши данные, расписание, история тренировок, книги, монеты и достижения будут безвозвратно стёрты!`);
+  if (!firstConfirm) return;
+
+  const secondConfirm = confirm(`🚨 ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ:\nУдалить аккаунт @${username} без возможности восстановления? Нажмите «ОК» для подтверждения.`);
+  if (!secondConfirm) return;
+
+  // 1. Remove user from allUsers map
+  const users = getAllUsers();
+  const lowerUser = username.toLowerCase();
+  if (users[lowerUser]) {
+    delete users[lowerUser];
+    saveAllUsers(users);
+  }
+
+  // 2. Remove user from unlockedBy in achievements
+  try {
+    const achievements = getAchievements();
+    achievements.forEach(ach => {
+      if (ach.unlockedBy && Array.isArray(ach.unlockedBy)) {
+        ach.unlockedBy = ach.unlockedBy.filter(u => u.toLowerCase() !== lowerUser && u.toLowerCase() !== 'shahboz');
+      }
+    });
+    saveAchievements(achievements);
+  } catch (e) {
+    console.error('Error cleaning achievements on account delete:', e);
+  }
+
+  // 3. Clear localStorage active user and session
+  try {
+    localStorage.removeItem(APP_SESSION_KEY);
+    localStorage.removeItem(APP_DATA_KEY);
+  } catch (e) {}
+
+  currentUser = null;
+  closeProfileModal();
+  showAuthScreen();
+  alert(`🗑️ Аккаунт @${username} был успешно и полностью удален.`);
 }
 
 function updateUserCoinsUI() {
@@ -5870,6 +5939,7 @@ function renderLeaderboard() {
       user: u,
       username: u.username || '',
       displayName: u.name || u.username || 'Пользователь',
+      isPrivate: !!u.isPrivate,
       unlockedCount,
       coins,
       equippedFont: u.equippedFont || '',
@@ -5890,22 +5960,51 @@ function renderLeaderboard() {
     const rankMedal = rank === 1 ? '🥇 1' : rank === 2 ? '🥈 2' : rank === 3 ? '🥉 3' : `${rank}`;
     const isMe = item.username.toLowerCase() === currentUName;
 
-    const firstChar = item.displayName.charAt(0).toUpperCase();
-    const badgeHtml = getBadgeHtml(item.equippedBadge);
-
     const tr = document.createElement('tr');
     if (isMe) tr.className = 'lb-current-user';
+
+    let avatarHtml = '';
+    let nameHtml = '';
+    let usernameHtml = '';
+
+    if (item.isPrivate && !isMe) {
+      avatarHtml = `
+        <div class="lb-avatar lb-foggy-avatar" title="Профиль скрыт пользователем (Режим приватности)">
+          <div class="foggy-inner">🌫️</div>
+        </div>
+      `;
+      nameHtml = `
+        <div class="lb-name-foggy" title="Имя скрыто настройками приватности">
+          <span class="foggy-text">Анонимный атлет</span>
+          <span class="privacy-ghost-badge">🔒 Инкогнито</span>
+        </div>
+      `;
+      usernameHtml = `<div class="lb-user-foggy" title="Логин скрыт">@••••••••</div>`;
+    } else {
+      const badgeHtml = getBadgeHtml(item.equippedBadge);
+      avatarHtml = `<div class="lb-avatar">${getAvatarHtml(item.user, 36)}</div>`;
+      
+      let selfPrivacyTag = '';
+      if (item.isPrivate && isMe) {
+        selfPrivacyTag = '<span class="privacy-ghost-badge" title="Режим инкогнито активен: другие пользователи видят вас как Анонимного атлета 🌫️">🔒 Инкогнито</span>';
+      }
+
+      nameHtml = `
+        <div style="font-weight: 800;" class="${item.equippedFont}">
+          ${escapeHtml(item.displayName)} ${badgeHtml} ${selfPrivacyTag} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 4px;">(Вы)</span>' : ''}
+        </div>
+      `;
+      usernameHtml = `<div style="font-size: 11px; color: var(--text-dim);">@${escapeHtml(item.username)}</div>`;
+    }
 
     tr.innerHTML = `
       <td class="lb-rank">${rankMedal}</td>
       <td>
         <div class="lb-user-cell">
-          <div class="lb-avatar">${getAvatarHtml(item.user, 36)}</div>
+          ${avatarHtml}
           <div>
-            <div style="font-weight: 800;" class="${item.equippedFont}">
-              ${escapeHtml(item.displayName)} ${badgeHtml} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 4px;">(Вы)</span>' : ''}
-            </div>
-            <div style="font-size: 11px; color: var(--text-dim);">@${escapeHtml(item.username)}</div>
+            ${nameHtml}
+            ${usernameHtml}
           </div>
         </div>
       </td>
