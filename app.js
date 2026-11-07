@@ -392,6 +392,24 @@ function switchAuthTab(tab) {
   }
 }
 
+function togglePasswordVisibility(inputId, btnEl) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (btnEl) {
+      btnEl.textContent = '🙈';
+      btnEl.setAttribute('aria-label', 'Скрыть пароль');
+    }
+  } else {
+    input.type = 'password';
+    if (btnEl) {
+      btnEl.textContent = '👁️';
+      btnEl.setAttribute('aria-label', 'Показать пароль');
+    }
+  }
+}
+
 function handleLoginSubmit(e) {
   e.preventDefault();
   const usernameInput = (document.getElementById('loginUsername').value || '').trim().toLowerCase();
