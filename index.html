@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -157,6 +157,9 @@
             <p class="penalty-rules-tip">
               * За каждый пропущенный день отжиманий начисляется <b>5 000 сум</b>.
             </p>
+            <button type="button" class="clear-penalties-btn" onclick="clearAllPenalties()">
+              🧹 Очистить все штрафы (включая сегодня)
+            </button>
           </div>
 
           <!-- Month Selector -->
@@ -244,9 +247,37 @@
             </div>
           </div>
 
-          <!-- Exercises Breakdown Section -->
+          <!-- Report Section 1: Today's Workout Execution vs Plan -->
           <div class="section-card">
-            <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">Выполненные упражнения</h3>
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 10px;">
+              <div>
+                <span class="section-title">Тренировка на сегодня: План vs Факт</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;" id="repTodaySubtitle">Суббота, 7 ноября</p>
+              </div>
+              <button class="add-slot-btn" onclick="switchView('viewPushups')">К тренировке 💪</button>
+            </div>
+            <div id="todayWorkoutReportList">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+          <!-- Report Section 2: Weekly Workout Days Matrix -->
+          <div class="section-card">
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 10px;">
+              <div>
+                <span class="section-title">График тренировок по дням недели</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">В какой день недели какое упражнение запланировано</p>
+              </div>
+              <button class="add-slot-btn" onclick="openExerciseModal()">+ Упражнение</button>
+            </div>
+            <div class="week-split-grid" id="weekDaysScheduleMatrix">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+          <!-- Report Section 3: Exercises Volume for Period -->
+          <div class="section-card">
+            <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">Объем упражнений за выбранный период</h3>
             <div class="exercise-report-list" id="exerciseReportList">
               <!-- Rendered by JS -->
             </div>
@@ -320,7 +351,10 @@
           <div class="slot-exercises-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <span style="font-size: 13px; font-weight: 700; color: #a5b4fc;">Упражнения блока (подходы / планка)</span>
-              <button type="button" class="add-slot-btn" onclick="addExerciseFieldToSlot()" style="padding: 4px 8px; font-size: 11px;">+ Добавить</button>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="add-slot-btn" onclick="openExerciseModal()" style="padding: 4px 8px; font-size: 11px; background: rgba(99,102,241,0.2); border-color: #6366f1;">+ В базу</button>
+                <button type="button" class="add-slot-btn" onclick="addExerciseFieldToSlot()" style="padding: 4px 8px; font-size: 11px;">+ Добавить</button>
+              </div>
             </div>
             <div id="slotExercisesContainer" class="slot-ex-container">
               <!-- Dynamic rows of exercises for this block -->
@@ -498,6 +532,18 @@
             <label id="newExTargetLabel">Целевое количество подходов</label>
             <input type="number" id="newExerciseTarget" value="4" min="1" max="500" required>
           </div>
+          <div class="input-group">
+            <label>Дни выполнения в неделю</label>
+            <div class="days-select-grid" id="newExerciseDaysGrid">
+              <label class="day-checkbox-label"><input type="checkbox" value="mon" checked> Пн</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="tue" checked> Вт</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="wed" checked> Ср</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="thu" checked> Чт</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="fri" checked> Пт</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="sat" checked> Сб</label>
+              <label class="day-checkbox-label"><input type="checkbox" value="sun" checked> Вс</label>
+            </div>
+          </div>
           <div class="modal-buttons">
             <button type="button" class="cancel-btn" onclick="closeExerciseModal()">Отмена</button>
             <button type="submit" class="primary-btn">Добавить</button>
@@ -534,6 +580,6 @@
 
   </div>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
