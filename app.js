@@ -4,8 +4,8 @@
  */
 
 // Storage Keys
-const USERS_STORAGE_KEY = 'discipline_os_users_v1';
-const CURRENT_USER_KEY = 'discipline_os_current_user_v1';
+const APP_DATA_KEY = 'discipline_os_data_v2';
+const LEGACY_USERS_KEY = 'discipline_os_users_v1';
 const DEFAULT_PENALTY_AMOUNT = 5000; // 5 000 сум
 
 // State
@@ -14,92 +14,74 @@ let selectedPenaltyDate = new Date(); // Tracks viewing month in penalty tab
 let currentReportPeriod = 'all'; // 'all' | 'month' | 'week'
 let lastNotifiedMinute = ''; // Prevents duplicate TG notifications in the same minute
 
-// Default categories
-const DEFAULT_CATEGORIES = [
-  { id: 'routine', name: 'Утро / Рутина', emoji: '🌅', color: '#38bdf8' },
-  { id: 'work', name: 'Работа / Учеба', emoji: '💼', color: '#818cf8' },
-  { id: 'sport', name: 'Спорт / Тренировка', emoji: '🥊', color: '#f43f5e' },
-  { id: 'rest', name: 'Отдых / Обед', emoji: '🧘', color: '#34d399' },
-  { id: 'sleep', name: 'Сон / Отбой', emoji: '🌙', color: '#a78bfa' }
-];
-
-// Default strict schedule for newly registered users with integrated exercises & penalties
-const DEFAULT_SCHEDULE_SLOTS = [
-  { id: 's1', name: '🌅 Подъем, вода, зарядка', start: '06:30', end: '07:15', category: 'routine', penalty: 2000, exercises: [] },
-  { 
-    id: 's2', 
-    name: '💪 Тренировка и норма отжиманий', 
-    start: '07:15', 
-    end: '08:00', 
-    category: 'sport', 
-    penalty: 5000, 
-    exercises: [
-      { name: 'Отжимания от пола', sets: 4, target: 25, unit: 'раз' },
-      { name: 'Планка', sets: 3, target: 60, unit: 'сек' }
-    ] 
-  },
-  { id: 's3', name: '🍳 Питательный завтрак и душ', start: '08:00', end: '08:45', category: 'routine', penalty: 2000, exercises: [] },
-  { id: 's4', name: '🎯 Глубокая работа / Учеба (Блок 1)', start: '09:00', end: '13:00', category: 'work', penalty: 10000, exercises: [] },
-  { id: 's5', name: '🥗 Обед и перезагрузка', start: '13:00', end: '14:00', category: 'rest', penalty: 2000, exercises: [] },
-  { id: 's6', name: '💼 Работа, задачи и проекты (Блок 2)', start: '14:00', end: '18:00', category: 'work', penalty: 10000, exercises: [] },
-  { id: 's7', name: '🚶 Прогулка, разгрузка, свежий воздух', start: '18:00', end: '19:00', category: 'rest', penalty: 3000, exercises: [] },
-  { id: 's8', name: '🍽️ Ужин и время с семьей', start: '19:00', end: '20:30', category: 'routine', penalty: 3000, exercises: [] },
-  { id: 's9', name: '📚 Чтение книги и итоги дня', start: '20:30', end: '22:00', category: 'work', penalty: 5000, exercises: [] },
-  { id: 's10', name: '🌙 Подготовка ко сну, без гаджетов', start: '22:30', end: '23:00', category: 'sleep', penalty: 5000, exercises: [] }
-];
-
-// Initialize application on page load
+// Initialize application on page load (Прямой вход без пароля!)
 document.addEventListener('DOMContentLoaded', () => {
   initLiveClock();
-  checkAuthSession();
+  initUserData();
   registerServiceWorker();
   initTelegramReminderDaemon();
+  showMainScreen();
 });
 
 /* =========================================================
-   AUTHENTICATION & USER SESSIONS
+   USER DATA STORAGE (Персональный доступ без пароля)
    ========================================================= */
 
-function getAllUsers() {
+function initUserData() {
   try {
-    return JSON.parse(localStorage.getItem(USERS_STORAGE_KEY)) || {};
-  } catch (e) {
-    console.error('Failed to parse users', e);
-    return {};
-  }
-}
-
-function saveAllUsers(users) {
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-}
-
-function checkAuthSession() {
-  try {
-    const currentUsername = localStorage.getItem(CURRENT_USER_KEY);
-    const users = getAllUsers();
-
-    if (currentUsername && users[currentUsername]) {
-      currentUser = users[currentUsername];
-      ensureUserDefaults();
-      showMainScreen();
-    } else {
-      showAuthScreen();
+    const raw = localStorage.getItem(APP_DATA_KEY);
+    if (raw) {
+      currentUser = JSON.parse(raw);
     }
   } catch (e) {
-    console.error('checkAuthSession error:', e);
-    showAuthScreen();
+    console.error('Error loading data:', e);
   }
+
+  // If not yet saved in v2, load legacy profile from v1
+  if (!currentUser) {
+    try {
+      const legacyRaw = localStorage.getItem(LEGACY_USERS_KEY);
+      if (legacyRaw) {
+        const legacyUsers = JSON.parse(legacyRaw);
+        const firstKey = Object.keys(legacyUsers)[0];
+        if (firstKey && legacyUsers[firstKey]) {
+          currentUser = legacyUsers[firstKey];
+        }
+      }
+    } catch (e) {}
+  }
+
+  // If still no user, create default profile for Shahboz
+  if (!currentUser) {
+    const todayKey = getTodayDateKey();
+    currentUser = {
+      name: 'Шахбоз',
+      username: 'shahbozjony',
+      createdAt: new Date().toISOString(),
+      streak: 0,
+      categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+      scheduleSlots: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SLOTS)),
+      scheduleCompletions: {},
+      workoutLogs: {
+        [todayKey]: { status: 'pending', penalty: 5000, exercises: {} }
+      },
+      exercises: JSON.parse(JSON.stringify(DEFAULT_EXERCISES)),
+      telegramConfig: { token: '', chatId: '', notifyBlocks: true, notifyPenalties: true }
+    };
+  }
+
+  ensureUserDefaults();
 }
 
 function ensureUserDefaults() {
   if (!currentUser) return;
+  if (!currentUser.name) currentUser.name = 'Шахбоз';
   if (!currentUser.categories || currentUser.categories.length === 0) {
     currentUser.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   }
   if (!currentUser.scheduleSlots) {
     currentUser.scheduleSlots = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SLOTS));
   }
-  // Ensure slots have penalty & exercises fields
   currentUser.scheduleSlots.forEach(slot => {
     if (slot.penalty === undefined) slot.penalty = DEFAULT_PENALTY_AMOUNT;
     if (!slot.exercises) slot.exercises = [];
@@ -111,251 +93,30 @@ function ensureUserDefaults() {
   saveCurrentUser();
 }
 
-function switchAuthTab(tab) {
-  const loginForm = document.getElementById('loginForm');
-  const regForm = document.getElementById('registerForm');
-  const tabLoginBtn = document.getElementById('tabLoginBtn');
-  const tabRegisterBtn = document.getElementById('tabRegisterBtn');
-  const loginError = document.getElementById('loginError');
-  const regError = document.getElementById('regError');
-
-  loginError.classList.add('hidden');
-  regError.classList.add('hidden');
-
-  if (tab === 'login') {
-    loginForm.classList.remove('hidden');
-    regForm.classList.add('hidden');
-    tabLoginBtn.classList.add('active');
-    tabRegisterBtn.classList.remove('active');
-    renderSavedAccounts();
-  } else {
-    loginForm.classList.add('hidden');
-    regForm.classList.remove('hidden');
-    tabLoginBtn.classList.remove('active');
-    tabRegisterBtn.classList.add('active');
-  }
-}
-
-function renderSavedAccounts() {
-  const users = getAllUsers();
-  const container = document.getElementById('savedAccountsContainer');
-  const list = document.getElementById('savedAccountsList');
-  if (!container || !list) return;
-
-  const usernames = Object.keys(users);
-  if (usernames.length === 0) {
-    container.classList.add('hidden');
-    return;
-  }
-
-  container.classList.remove('hidden');
-  list.innerHTML = '';
-
-  usernames.forEach(uname => {
-    const u = users[uname];
-    const row = document.createElement('div');
-    row.className = 'saved-acc-item';
-    row.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 16px;">👤</span>
-        <div>
-          <div style="font-size: 13px; font-weight: 700;">${escapeHtml(u.name || uname)}</div>
-          <div style="font-size: 11px; color: var(--text-dim);">@${uname}</div>
-        </div>
-      </div>
-      <button type="button" class="saved-acc-btn" onclick="quickLoginAs('${uname}')">Войти в 1 клик</button>
-    `;
-    list.appendChild(row);
-  });
-}
-
-function quickLoginAs(username) {
-  const users = getAllUsers();
-  if (users[username]) {
-    currentUser = users[username];
-    ensureUserDefaults();
-    localStorage.setItem(CURRENT_USER_KEY, username);
-    showMainScreen();
-  }
-}
-
-function handleLogin(e) {
-  e.preventDefault();
-  const usernameInput = document.getElementById('loginUsername').value.trim();
-  const username = usernameInput.toLowerCase();
-  const password = document.getElementById('loginPassword').value;
-  const loginError = document.getElementById('loginError');
-
-  const users = getAllUsers();
-  let user = users[username];
-  if (!user) {
-    const foundKey = Object.keys(users).find(k => k.toLowerCase() === username || (users[k].name && users[k].name.toLowerCase() === username));
-    if (foundKey) user = users[foundKey];
-  }
-
-  if (!user) {
-    showError(loginError, 'Аккаунт с таким логином не найден на этом устройстве');
-    renderSavedAccounts();
-    return;
-  }
-
-  if (user.password !== password) {
-    showError(loginError, 'Неверный пароль. Нажмите "Войти в 1 клик" на карточке аккаунта ниже');
-    renderSavedAccounts();
-    return;
-  }
-
-  currentUser = user;
-  ensureUserDefaults();
-  localStorage.setItem(CURRENT_USER_KEY, user.username);
-
-  document.getElementById('loginForm').reset();
-  showMainScreen();
-}
-
-function handleRegister(e) {
-  e.preventDefault();
-  const name = document.getElementById('regName').value.trim();
-  const username = document.getElementById('regUsername').value.trim().toLowerCase();
-  const password = document.getElementById('regPassword').value;
-  const regError = document.getElementById('regError');
-
-  if (!name || !username || !password) {
-    showError(regError, 'Пожалуйста, заполните все поля');
-    return;
-  }
-
-  if (password.length < 4) {
-    showError(regError, 'Пароль должен быть не менее 4 символов');
-    return;
-  }
-
-  const users = getAllUsers();
-  if (users[username]) {
-    showError(regError, 'Пользователь с таким логином уже существует');
-    return;
-  }
-
-  const todayKey = getTodayDateKey();
-  const newUser = {
-    name: name,
-    username: username,
-    password: password,
-    createdAt: new Date().toISOString(),
-    streak: 0,
-    categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-    scheduleSlots: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SLOTS)),
-    scheduleCompletions: {},
-    workoutLogs: {
-      [todayKey]: { status: 'pending', penalty: 5000, exercises: {} }
-    },
-    telegramConfig: { token: '', chatId: '', notifyBlocks: true, notifyPenalties: true }
-  };
-
-  users[username] = newUser;
-  saveAllUsers(users);
-
-  currentUser = newUser;
-  localStorage.setItem(CURRENT_USER_KEY, username);
-
-  document.getElementById('registerForm').reset();
-  showMainScreen();
-}
-
-function handleLogin(e) {
-  e.preventDefault();
-  const username = document.getElementById('loginUsername').value.trim().toLowerCase();
-  const password = document.getElementById('loginPassword').value;
-  const loginError = document.getElementById('loginError');
-
-  const users = getAllUsers();
-  const user = users[username];
-
-  if (!user || user.password !== password) {
-    showError(loginError, 'Неверный логин или пароль');
-    return;
-  }
-
-  currentUser = user;
-  ensureUserDefaults();
-  localStorage.setItem(CURRENT_USER_KEY, username);
-
-  document.getElementById('loginForm').reset();
-  showMainScreen();
-}
-
-function handleLogout() {
-  localStorage.removeItem(CURRENT_USER_KEY);
-  currentUser = null;
-  closeProfileModal();
-  showAuthScreen();
-}
-
-function confirmDeleteAccount() {
-  if (!currentUser) return;
-
-  const confirmed = confirm(
-    `ВНИМАНИЕ!\n\nВы действительно хотите навсегда удалить аккаунт @${currentUser.username}?\n\nВсе ваши тренировки, жесткое расписание и история штрафов будут стёрты БЕЗ ВОЗМОЖНОСТИ восстановления!`
-  );
-
-  if (!confirmed) return;
-
-  const doubleCheck = prompt('Для подтверждения напишите слово "УДАЛИТЬ":');
-  if (doubleCheck && doubleCheck.trim().toUpperCase() === 'УДАЛИТЬ') {
-    const users = getAllUsers();
-    delete users[currentUser.username];
-    saveAllUsers(users);
-
-    localStorage.removeItem(CURRENT_USER_KEY);
-    currentUser = null;
-
-    closeProfileModal();
-    alert('Ваш аккаунт и все данные полностью удалены. Чтобы продолжить, создайте новый аккаунт.');
-    showAuthScreen();
-  } else {
-    alert('Удаление отменено.');
-  }
-}
-
 function saveCurrentUser() {
   if (!currentUser) return;
-  const users = getAllUsers();
-  users[currentUser.username] = currentUser;
-  saveAllUsers(users);
+  try {
+    localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+  } catch (e) {
+    console.error('Error saving data:', e);
+  }
 }
 
-function showError(element, text) {
-  element.textContent = text;
-  element.classList.remove('hidden');
-}
-
-function showAuthScreen() {
-  const auth = document.getElementById('authScreen');
-  const main = document.getElementById('mainScreen');
-  if (auth) {
-    auth.classList.add('active');
-    auth.classList.remove('hidden');
+function confirmResetData() {
+  if (confirm('ВНИМАНИЕ!\n\nСбросить расписание, упражнения и отметки к начальным настройкам?')) {
+    localStorage.removeItem(APP_DATA_KEY);
+    localStorage.removeItem(LEGACY_USERS_KEY);
+    localStorage.removeItem('discipline_os_current_user_v1');
+    currentUser = null;
+    initUserData();
+    showMainScreen();
+    closeProfileModal();
+    alert('Настройки успешно сброшены к начальным!');
   }
-  if (main) {
-    main.classList.remove('active');
-    main.classList.add('hidden');
-  }
-  renderSavedAccounts();
 }
 
 function showMainScreen() {
   try {
-    const auth = document.getElementById('authScreen');
-    const main = document.getElementById('mainScreen');
-    if (auth) {
-      auth.classList.remove('active');
-      auth.classList.add('hidden');
-    }
-    if (main) {
-      main.classList.add('active');
-      main.classList.remove('hidden');
-    }
-
     ensureUserDefaults();
     renderUserProfile();
     renderSchedule();
