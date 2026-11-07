@@ -1,9 +1,9 @@
-const CACHE_NAME = 'discipline-os-v20';
+const CACHE_NAME = 'discipline-os-v21';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=20',
-  './app.js?v=20',
+  './style.css?v=21',
+  './app.js?v=21',
   './manifest.json',
   './favicon.svg'
 ];
