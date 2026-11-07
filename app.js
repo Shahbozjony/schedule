@@ -735,12 +735,62 @@ function initLiveClock() {
   setInterval(update, 1000);
 }
 
+function getAvatarHtml(userOrAvatar, size = 38) {
+  let av = null;
+  let initial = 'Ш';
+  if (userOrAvatar) {
+    if (userOrAvatar.avatar !== undefined) {
+      av = userOrAvatar.avatar;
+      initial = (userOrAvatar.name || userOrAvatar.username || 'Ш').charAt(0).toUpperCase();
+    } else {
+      av = userOrAvatar;
+    }
+  }
+
+  // 1. Gallery uploaded photo (data URL)
+  if (av && av.type === 'image' && av.value) {
+    return `<div class="avatar-circle avatar-img-wrap" style="width:${size}px; height:${size}px;">
+      <img src="${escapeHtml(av.value)}" alt="Avatar" class="avatar-img" />
+    </div>`;
+  }
+
+  // 2. Shop purchased exclusive art avatar
+  if (av && av.type === 'shop' && av.itemId) {
+    const shopItem = SHOP_ITEMS.find(i => i.id === av.itemId);
+    const avData = (shopItem && shopItem.avatarData) || {};
+    const icon = avData.icon || av.icon || '⭐';
+    const bg = avData.bg || av.bg || 'linear-gradient(135deg, #1e1b4b, #312e81)';
+    const glow = avData.glow || '';
+    const fontSize = Math.round(size * 0.52);
+    return `<div class="avatar-circle avatar-shop-circle" style="width:${size}px; height:${size}px; font-size:${fontSize}px; background:${bg}; box-shadow:${glow};">
+      ${icon}
+    </div>`;
+  }
+
+  // 3. Custom text / emoji / number with custom background
+  if (av && av.type === 'text') {
+    const text = av.text || initial;
+    const bg = av.bg || 'linear-gradient(135deg, #f43f5e, #f59e0b)';
+    const color = av.color || '#ffffff';
+    const len = Array.from(text).length;
+    const fontSize = len > 2 ? Math.round(size * 0.36) : (len > 1 ? Math.round(size * 0.44) : Math.round(size * 0.52));
+    return `<div class="avatar-circle avatar-custom-text" style="width:${size}px; height:${size}px; font-size:${fontSize}px; background:${bg}; color:${color}; font-weight:800;">
+      ${escapeHtml(text)}
+    </div>`;
+  }
+
+  // 4. Default letter initial
+  const fontSize = Math.round(size * 0.48);
+  return `<div class="avatar-circle avatar-default" style="width:${size}px; height:${size}px; font-size:${fontSize}px; font-weight:800;">
+    ${escapeHtml(initial)}
+  </div>`;
+}
+
 function renderUserProfile() {
   if (!currentUser) return;
-  const firstLetter = currentUser.name.charAt(0).toUpperCase();
 
   const userAvatar = document.getElementById('userAvatar');
-  if (userAvatar) userAvatar.textContent = firstLetter;
+  if (userAvatar) userAvatar.innerHTML = getAvatarHtml(currentUser, 42);
 
   const fontClass = currentUser.equippedFont || '';
   const badgeHtml = getBadgeHtml(currentUser.equippedBadge);
@@ -752,7 +802,7 @@ function renderUserProfile() {
   }
 
   const profileBigAvatar = document.getElementById('profileBigAvatar');
-  if (profileBigAvatar) profileBigAvatar.textContent = firstLetter;
+  if (profileBigAvatar) profileBigAvatar.innerHTML = getAvatarHtml(currentUser, 64);
 
   const profileName = document.getElementById('profileName');
   if (profileName) {
@@ -799,6 +849,233 @@ function openProfileModal() {
 
 function closeProfileModal() {
   document.getElementById('profileModal').classList.add('hidden');
+}
+
+/* =========================================================
+   AVATAR SYSTEM & AVATAR MODAL
+   ========================================================= */
+
+let tempUploadedAvatarData = null;
+let selectedTextAvatarBg = 'linear-gradient(135deg, #f43f5e, #f59e0b)';
+
+const AVATAR_GRADIENTS = [
+  { name: 'Огонь', bg: 'linear-gradient(135deg, #f43f5e, #f59e0b)' },
+  { name: 'Индиго', bg: 'linear-gradient(135deg, #6366f1, #8b5cf6)' },
+  { name: 'Кибер', bg: 'linear-gradient(135deg, #06b6d4, #3b82f6)' },
+  { name: 'Изумруд', bg: 'linear-gradient(135deg, #10b981, #059669)' },
+  { name: 'Золото', bg: 'linear-gradient(135deg, #f59e0b, #b45309)' },
+  { name: 'Закат', bg: 'linear-gradient(135deg, #ec4899, #8b5cf6)' },
+  { name: 'Космос', bg: 'linear-gradient(135deg, #1e1b4b, #0f172a)' },
+  { name: 'Карбон', bg: 'linear-gradient(135deg, #374151, #111827)' }
+];
+
+function openAvatarModal() {
+  if (!currentUser) return;
+  tempUploadedAvatarData = null;
+  const actRow = document.getElementById('avatarPhotoActionRow');
+  if (actRow) actRow.classList.add('hidden');
+
+  const textInput = document.getElementById('avatarTextInput');
+  if (textInput) {
+    if (currentUser.avatar && currentUser.avatar.type === 'text') {
+      textInput.value = currentUser.avatar.text || '';
+      if (currentUser.avatar.bg) selectedTextAvatarBg = currentUser.avatar.bg;
+    } else {
+      textInput.value = '';
+    }
+  }
+
+  initAvatarPalette();
+  updateAvatarModalPreview();
+  renderAvatarShopUnlocked();
+  switchAvatarSubTab('photo');
+
+  document.getElementById('avatarModal').classList.remove('hidden');
+}
+
+function closeAvatarModal() {
+  document.getElementById('avatarModal').classList.add('hidden');
+}
+
+function switchAvatarSubTab(subTab) {
+  ['photo', 'text', 'shop'].forEach(t => {
+    const btn = document.getElementById(`avTabBtn_${t}`);
+    const view = document.getElementById(`avSubView_${t}`);
+    if (btn) btn.classList.toggle('active', t === subTab);
+    if (view) view.classList.toggle('hidden', t !== subTab);
+  });
+  updateAvatarModalPreview();
+}
+
+function updateAvatarModalPreview() {
+  const previewEl = document.getElementById('avatarModalPreview');
+  if (!previewEl || !currentUser) return;
+  previewEl.innerHTML = getAvatarHtml(currentUser, 76);
+}
+
+function handleAvatarFileSelect(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const size = 256;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      const minDim = Math.min(img.width, img.height);
+      const sx = (img.width - minDim) / 2;
+      const sy = (img.height - minDim) / 2;
+
+      ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+
+      tempUploadedAvatarData = canvas.toDataURL('image/jpeg', 0.85);
+
+      const previewEl = document.getElementById('avatarModalPreview');
+      if (previewEl) {
+        previewEl.innerHTML = `<div class="avatar-circle avatar-img-wrap" style="width:76px; height:76px;"><img src="${tempUploadedAvatarData}" alt="Preview" class="avatar-img" /></div>`;
+      }
+
+      const actRow = document.getElementById('avatarPhotoActionRow');
+      if (actRow) actRow.classList.remove('hidden');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function applyUploadedAvatarPhoto() {
+  if (!currentUser || !tempUploadedAvatarData) return;
+  currentUser.avatar = { type: 'image', value: tempUploadedAvatarData };
+  saveCurrentUser();
+  renderUserProfile();
+  renderLeaderboard();
+  closeAvatarModal();
+  playHapticSound('targetAchieved');
+  alert('🎉 Новая аватарка из фото успешно установлена!');
+}
+
+function initAvatarPalette() {
+  const container = document.getElementById('avatarBgPalette');
+  if (!container) return;
+  container.innerHTML = '';
+
+  AVATAR_GRADIENTS.forEach((item, idx) => {
+    const swatch = document.createElement('div');
+    const isSelected = selectedTextAvatarBg === item.bg || (!selectedTextAvatarBg && idx === 0);
+    swatch.className = `av-palette-swatch ${isSelected ? 'active' : ''}`;
+    swatch.style.background = item.bg;
+    swatch.innerHTML = isSelected ? '✓' : '';
+    swatch.title = item.name;
+    swatch.onclick = () => {
+      selectedTextAvatarBg = item.bg;
+      container.querySelectorAll('.av-palette-swatch').forEach(s => {
+        s.classList.remove('active');
+        s.innerHTML = '';
+      });
+      swatch.classList.add('active');
+      swatch.innerHTML = '✓';
+      updateAvatarTextPreview();
+    };
+    container.appendChild(swatch);
+  });
+}
+
+function updateAvatarTextPreview() {
+  const input = document.getElementById('avatarTextInput');
+  const textVal = (input && input.value.trim()) || (currentUser ? currentUser.name.charAt(0).toUpperCase() : 'Ш');
+  const previewEl = document.getElementById('avatarModalPreview');
+  if (previewEl) {
+    const dummyUser = {
+      name: currentUser ? currentUser.name : 'Ш',
+      avatar: { type: 'text', text: textVal, bg: selectedTextAvatarBg }
+    };
+    previewEl.innerHTML = getAvatarHtml(dummyUser, 76);
+  }
+}
+
+function applyCustomTextAvatar() {
+  if (!currentUser) return;
+  const input = document.getElementById('avatarTextInput');
+  const textVal = (input && input.value.trim()) || currentUser.name.charAt(0).toUpperCase();
+
+  currentUser.avatar = {
+    type: 'text',
+    text: textVal,
+    bg: selectedTextAvatarBg || 'linear-gradient(135deg, #f43f5e, #f59e0b)'
+  };
+
+  saveCurrentUser();
+  renderUserProfile();
+  renderLeaderboard();
+  closeAvatarModal();
+  playHapticSound('targetAchieved');
+  alert(`🎉 Аватарка успешно обновлена на символ: ${textVal}!`);
+}
+
+function renderAvatarShopUnlocked() {
+  const grid = document.getElementById('avatarShopUnlockedGrid');
+  if (!grid || !currentUser) return;
+  grid.innerHTML = '';
+
+  const inventory = currentUser.inventory || [];
+  const shopAvatars = SHOP_ITEMS.filter(i => i.category === 'avatar');
+  const ownedAvatars = shopAvatars.filter(i => inventory.includes(i.id));
+
+  if (ownedAvatars.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 16px 8px; color: var(--text-dim); font-size: 12px; background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); border: 1px dashed rgba(255,255,255,0.1);">
+        У вас пока нет купленных аватарок из Магазина.<br>
+        <span style="color: #f59e0b;">Зайдите в Магазин наград, чтобы разблокировать льва, дракона, феникса и другие арты!</span>
+      </div>
+    `;
+    return;
+  }
+
+  ownedAvatars.forEach(item => {
+    const isEquipped = currentUser.avatar && currentUser.avatar.type === 'shop' && currentUser.avatar.itemId === item.id;
+    const card = document.createElement('div');
+    card.className = `av-shop-unlocked-card ${isEquipped ? 'equipped' : ''}`;
+    card.innerHTML = `
+      ${getAvatarHtml({ avatar: { type: 'shop', itemId: item.id } }, 44)}
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 12px; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</div>
+        <div style="font-size: 10px; color: ${isEquipped ? '#10b981' : 'var(--text-dim)'};">${isEquipped ? '✓ Надет' : 'Нажмите, чтобы надеть'}</div>
+      </div>
+    `;
+    card.onclick = () => {
+      selectShopAvatarFromModal(item.id);
+    };
+    grid.appendChild(card);
+  });
+}
+
+function selectShopAvatarFromModal(itemId) {
+  if (!currentUser) return;
+  currentUser.avatar = { type: 'shop', itemId };
+  saveCurrentUser();
+  renderUserProfile();
+  renderShop();
+  renderLeaderboard();
+  updateAvatarModalPreview();
+  renderAvatarShopUnlocked();
+  playHapticSound('targetAchieved');
+  alert('🎉 Эксклюзивная аватарка из Магазина успешно надета!');
+}
+
+function resetAvatarToDefault() {
+  if (!currentUser) return;
+  currentUser.avatar = null;
+  saveCurrentUser();
+  renderUserProfile();
+  renderShop();
+  renderLeaderboard();
+  closeAvatarModal();
+  alert('Аватарка сброшена к начальной букве вашего имени.');
 }
 
 /* =========================================================
@@ -4671,6 +4948,104 @@ const SHOP_ITEMS = [
     price: 110,
     badgeHtml: '<span class="tg-badge tg-badge-shield">🛡️</span>',
     previewHtml: '@USER <span class="tg-badge tg-badge-shield">🛡️</span>'
+  },
+
+  // --- ЭКСКЛЮЗИВНЫЕ АВАТАРКИ (АРТ & СИМВОЛЫ) ---
+  {
+    id: 'avatar_lion',
+    category: 'avatar',
+    name: '🦁 Золотой Лев (King Lion)',
+    desc: 'Символ абсолютной силы, благородства и лидерства',
+    price: 150,
+    avatarData: {
+      icon: '🦁',
+      bg: 'linear-gradient(135deg, #b45309, #78350f)',
+      glow: '0 0 16px rgba(245, 158, 11, 0.45)'
+    }
+  },
+  {
+    id: 'avatar_spartan',
+    category: 'avatar',
+    name: '🛡️ Спартанский Воин (Spartan Helm)',
+    desc: 'Символ несокрушимой воли, дисциплины и защиты от лени',
+    price: 130,
+    avatarData: {
+      icon: '🛡️',
+      bg: 'linear-gradient(135deg, #881337, #4c0519)',
+      glow: '0 0 16px rgba(244, 63, 94, 0.45)'
+    }
+  },
+  {
+    id: 'avatar_wolf',
+    category: 'avatar',
+    name: '🐺 Одинокий Волк (Sigma Wolf)',
+    desc: 'Несгибаемый дух, автономность и тихая упорная победа',
+    price: 120,
+    avatarData: {
+      icon: '🐺',
+      bg: 'linear-gradient(135deg, #1e293b, #0f172a)',
+      glow: '0 0 16px rgba(148, 163, 184, 0.4)'
+    }
+  },
+  {
+    id: 'avatar_phoenix',
+    category: 'avatar',
+    name: '🦅 Огненный Феникс (Fire Phoenix)',
+    desc: 'Возрождение после любого срыва, ещё сильнее и дисциплинированнее',
+    price: 160,
+    avatarData: {
+      icon: '🦅',
+      bg: 'linear-gradient(135deg, #ea580c, #7c2d12)',
+      glow: '0 0 18px rgba(234, 88, 12, 0.55)'
+    }
+  },
+  {
+    id: 'avatar_dragon',
+    category: 'avatar',
+    name: '🐉 Неоновый Дракон (Cyber Dragon)',
+    desc: 'Огнедышащая мощь, безграничные цели и победа над слабостями',
+    price: 140,
+    avatarData: {
+      icon: '🐉',
+      bg: 'linear-gradient(135deg, #065f46, #022c22)',
+      glow: '0 0 18px rgba(16, 185, 129, 0.5)'
+    }
+  },
+  {
+    id: 'avatar_ninja',
+    category: 'avatar',
+    name: '🥷 Теневой Ниндзя (Shadow Shinobi)',
+    desc: 'Тишина, скорость, режим и безупречная точность самурая',
+    price: 110,
+    avatarData: {
+      icon: '🥷',
+      bg: 'linear-gradient(135deg, #312e81, #1e1b4b)',
+      glow: '0 0 16px rgba(99, 102, 241, 0.45)'
+    }
+  },
+  {
+    id: 'avatar_crown',
+    category: 'avatar',
+    name: '👑 Император Дисциплины (Imperial Crown)',
+    desc: 'Для тех, кто закрывает 100% расписания и держит слово перед собой',
+    price: 180,
+    avatarData: {
+      icon: '👑',
+      bg: 'linear-gradient(135deg, #d97706, #451a03)',
+      glow: '0 0 20px rgba(217, 119, 6, 0.6)'
+    }
+  },
+  {
+    id: 'avatar_astronaut',
+    category: 'avatar',
+    name: '🚀 Космический Странник (Cosmic Voyager)',
+    desc: 'Выход за пределы орбиты, покорение новых высот в жизни и карьере',
+    price: 125,
+    avatarData: {
+      icon: '🚀',
+      bg: 'linear-gradient(135deg, #0284c7, #082f49)',
+      glow: '0 0 16px rgba(14, 165, 233, 0.45)'
+    }
   }
 ];
 
@@ -4809,6 +5184,59 @@ function renderShop() {
       badgesGrid.appendChild(card);
     });
   }
+
+  // Render avatars
+  const avatarsGrid = document.getElementById('shopAvatarsGrid');
+  if (avatarsGrid) {
+    avatarsGrid.innerHTML = '';
+    const avatarItems = SHOP_ITEMS.filter(i => i.category === 'avatar');
+    avatarItems.forEach(item => {
+      const isOwned = inventory.includes(item.id);
+      const isEquipped = currentUser.avatar && currentUser.avatar.type === 'shop' && currentUser.avatar.itemId === item.id;
+      const avHtml = getAvatarHtml({ avatar: { type: 'shop', itemId: item.id } }, 50);
+
+      let actionBtn = '';
+      if (!isOwned) {
+        const canAfford = coins >= item.price;
+        actionBtn = `
+          <button type="button" class="shop-buy-btn" ${canAfford ? '' : 'disabled'} onclick="buyShopItem('${item.id}')">
+            Купить за ${item.price} 🪙
+          </button>
+        `;
+      } else if (isEquipped) {
+        actionBtn = `
+          <button type="button" class="shop-unequip-btn" onclick="unequipShopItem('${item.id}')">
+            ✓ Надет (Снять)
+          </button>
+        `;
+      } else {
+        actionBtn = `
+          <button type="button" class="shop-equip-btn" onclick="equipShopItem('${item.id}')">
+            Надеть ✨
+          </button>
+        `;
+      }
+
+      const card = document.createElement('div');
+      card.className = `shop-item-card ${isEquipped ? 'equipped' : ''}`;
+      card.innerHTML = `
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            ${avHtml}
+            <div>
+              <div class="shop-item-title">${item.name}</div>
+              <div class="shop-item-desc">${item.desc}</div>
+            </div>
+          </div>
+        </div>
+        <div class="shop-item-footer">
+          <span class="gold-coins-pill">🪙 ${item.price}</span>
+          ${actionBtn}
+        </div>
+      `;
+      avatarsGrid.appendChild(card);
+    });
+  }
 }
 
 function buyShopItem(itemId) {
@@ -4835,6 +5263,7 @@ function buyShopItem(itemId) {
   // Auto equip
   if (item.category === 'font') currentUser.equippedFont = item.cssClass;
   if (item.category === 'badge') currentUser.equippedBadge = item.id;
+  if (item.category === 'avatar') currentUser.avatar = { type: 'shop', itemId: item.id };
 
   saveCurrentUser();
   playHapticSound('targetAchieved');
@@ -4852,6 +5281,7 @@ function equipShopItem(itemId) {
 
   if (item.category === 'font') currentUser.equippedFont = item.cssClass;
   if (item.category === 'badge') currentUser.equippedBadge = item.id;
+  if (item.category === 'avatar') currentUser.avatar = { type: 'shop', itemId: item.id };
 
   saveCurrentUser();
   renderShop();
@@ -4868,6 +5298,8 @@ function unequipShopItem(itemId) {
     currentUser.equippedFont = '';
   } else if (item.category === 'badge' && currentUser.equippedBadge === item.id) {
     currentUser.equippedBadge = '';
+  } else if (item.category === 'avatar' && currentUser.avatar && currentUser.avatar.itemId === item.id) {
+    currentUser.avatar = null;
   }
 
   saveCurrentUser();
@@ -4926,7 +5358,7 @@ function renderLeaderboard() {
       <td class="lb-rank">${rankMedal}</td>
       <td>
         <div class="lb-user-cell">
-          <div class="lb-avatar">${firstChar}</div>
+          <div class="lb-avatar">${getAvatarHtml(item.user, 36)}</div>
           <div>
             <div style="font-weight: 800;" class="${item.equippedFont}">
               ${escapeHtml(item.displayName)} ${badgeHtml} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 4px;">(Вы)</span>' : ''}
