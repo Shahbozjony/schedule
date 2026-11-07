@@ -1851,6 +1851,146 @@ body {
   opacity: 0.8;
 }
 
+.action-btn-danger-outline {
+  width: 100%;
+  background: rgba(244, 63, 94, 0.08);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn-danger-outline:active {
+  background: rgba(244, 63, 94, 0.2);
+}
+
+/* Privacy Mode Switch & Badges */
+.privacy-status-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.privacy-status-pill.active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+}
+
+.ios-switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 26px;
+  cursor: pointer;
+}
+
+.ios-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ios-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ios-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.ios-switch input:checked + .ios-slider {
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.ios-switch input:checked + .ios-slider:before {
+  transform: translateX(20px);
+}
+
+/* Foggy Privacy Mode in Leaderboard */
+.lb-foggy-avatar {
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.25) 0%, rgba(30, 41, 59, 0.8) 100%) !important;
+  border: 1px dashed rgba(148, 163, 184, 0.4) !important;
+  box-shadow: 0 0 12px rgba(148, 163, 184, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.foggy-inner {
+  font-size: 18px;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
+  animation: pulseFog 3s ease-in-out infinite alternate;
+}
+
+@keyframes pulseFog {
+  0% { opacity: 0.6; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1.05); }
+}
+
+.lb-name-foggy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.foggy-text {
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 8px rgba(148, 163, 184, 0.3);
+}
+
+.lb-user-foggy {
+  font-size: 11px;
+  color: #64748b;
+  letter-spacing: 1px;
+  user-select: none;
+}
+
+.privacy-ghost-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
 /* =========================================================
    BOTTOM NAVIGATION BAR (iPhone style)
    ========================================================= */
