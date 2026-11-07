@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=40">
+  <link rel="stylesheet" href="style.css?v=41">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -368,25 +368,6 @@
               <div id="steamOverallProgressBar" class="today-rep-bar-fill" style="width: 0%; background: linear-gradient(90deg, #f59e0b, #ec4899, #8b5cf6);"></div>
             </div>
 
-            <!-- Current User Rank Progress Card -->
-            <div class="user-rank-status-card" id="userRankStatusCard" onclick="switchAchievementsSubTab('ranks')" style="cursor: pointer;" title="Нажмите, чтобы открыть шкалу всех рангов">
-              <div class="rank-status-left">
-                <div class="rank-status-avatar-wrap" id="rankHeroAvatarWrap">
-                  <!-- Rendered by JS -->
-                </div>
-                <div class="rank-status-info">
-                  <div class="rank-status-top">
-                    <span class="rank-badge-pill" id="rankHeroPill">🛡️ Рекрут III</span>
-                    <span class="rank-pts-pill" id="rankHeroPts">1000 PTS</span>
-                  </div>
-                  <div class="rank-title-text" id="rankHeroTitle">Рекрут III</div>
-                  <div class="rank-next-text" id="rankHeroNextText">Открыто: 0 / 60 ачивок. До следующего ранга: 1 ачивка</div>
-                </div>
-              </div>
-              <div class="rank-status-action">
-                <button type="button" class="rank-view-ladder-btn" onclick="event.stopPropagation(); openRanksModal();">Таблица рангов ℹ️</button>
-              </div>
-            </div>
           </div>
 
           <!-- Achievements Subtabs Navigation -->
@@ -394,14 +375,11 @@
             <button class="ach-subnav-btn active" id="subtabBtn_trophies" onclick="switchAchievementsSubTab('trophies')">
               <span>🏆 Достижения</span>
             </button>
-            <button class="ach-subnav-btn" id="subtabBtn_ranks" onclick="switchAchievementsSubTab('ranks')">
-              <span>🎖️ Шкала рангов</span>
-            </button>
             <button class="ach-subnav-btn" id="subtabBtn_shop" onclick="switchAchievementsSubTab('shop')">
               <span>🏪 Магазин наград</span>
             </button>
             <button class="ach-subnav-btn" id="subtabBtn_leaderboard" onclick="switchAchievementsSubTab('leaderboard')">
-              <span>📊 Рейтинг онлайн</span>
+              <span>📊 Таблица лидеров</span>
             </button>
           </div>
 
@@ -428,13 +406,6 @@
               <button type="button" class="cancel-btn" style="font-size: 11px; opacity: 0.7; padding: 8px 14px;" onclick="resetMyAchievements()">
                 🧹 Сбросить мои достижения (начать заново с 0)
               </button>
-            </div>
-          </div>
-
-          <!-- SUBVIEW: RANKS & TIERS LADDER (ШКАЛА РАНГОВ И ИНСТРУКЦИЯ) -->
-          <div id="achSubView_ranks" class="hidden">
-            <div id="ranksContainerInline">
-              <!-- Rendered dynamically by JS -->
             </div>
           </div>
 
@@ -481,10 +452,15 @@
               <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                 <div>
                   <span class="badge-tag">🏆 Общий зачёт</span>
-                  <h3 style="font-size: 17px; margin-top: 3px;">Онлайн-рейтинг участников</h3>
+                  <h3 style="font-size: 17px; margin-top: 3px;">Таблица лидеров</h3>
+                  <p style="font-size: 11.5px; color: var(--text-dim); margin-top: 2px;">
+                    Сортировка по открытым достижениям и монетам (Coins)
+                  </p>
                 </div>
-                <div style="font-size: 12px; color: var(--text-dim);">
-                  Сортировка по открытым достижениям и Coins
+                <div>
+                  <button type="button" class="rank-view-ladder-btn" onclick="openRanksModal()">
+                    🏆 Шкала рангов ℹ️
+                  </button>
                 </div>
               </div>
 
@@ -1374,6 +1350,6 @@
 
   </div>
 
-  <script src="app.js?v=40"></script>
+  <script src="app.js?v=41"></script>
 </body>
 </html>
