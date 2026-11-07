@@ -180,9 +180,31 @@ function initUserData() {
     } catch (e) {}
   }
 
+  // MIGRATION: Delete legacy 'shahboz' account and transfer/merge all data to 'shahbozjony'
+  if (users['shahboz']) {
+    const oldUser = users['shahboz'];
+    if (!users['shahbozjony']) {
+      users['shahbozjony'] = oldUser;
+      users['shahbozjony'].username = 'shahbozjony';
+      if (!users['shahbozjony'].password || users['shahbozjony'].password === '1234') {
+        users['shahbozjony'].password = 'Schedule2004';
+      }
+    } else {
+      const target = users['shahbozjony'];
+      if ((!target.books || target.books.length === 0) && oldUser.books) target.books = oldUser.books;
+      if ((!target.scheduleSlots || target.scheduleSlots.length === 0) && oldUser.scheduleSlots) target.scheduleSlots = oldUser.scheduleSlots;
+      if (oldUser.scheduleLogs) target.scheduleLogs = Object.assign({}, oldUser.scheduleLogs, target.scheduleLogs || {});
+      if (oldUser.pushupLogs) target.pushupLogs = Object.assign({}, oldUser.pushupLogs, target.pushupLogs || {});
+      if (oldUser.studyLogs) target.studyLogs = Object.assign({}, oldUser.studyLogs, target.studyLogs || {});
+      if (oldUser.penalties) target.penalties = Object.assign({}, oldUser.penalties, target.penalties || {});
+    }
+    delete users['shahboz'];
+    saveAllUsers(users);
+  }
+
   // Always ensure shahbozjony account is configured with Schedule2004
   if (!users['shahbozjony']) {
-    const defaultUser = users['shahboz'] || existingUser || createDefaultUserProfile('Шахбоз', 'shahbozjony', 'Schedule2004');
+    const defaultUser = existingUser || createDefaultUserProfile('Шахбоз', 'shahbozjony', 'Schedule2004');
     defaultUser.username = 'shahbozjony';
     defaultUser.password = 'Schedule2004';
     if (!defaultUser.name) defaultUser.name = 'Шахбоз';
@@ -196,14 +218,37 @@ function initUserData() {
     }
   }
 
+  // Clean achievements storage: migrate any 'shahboz' unlockedBy to 'shahbozjony'
+  try {
+    const rawAch = localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY);
+    if (rawAch) {
+      let achs = JSON.parse(rawAch);
+      let changed = false;
+      achs.forEach(a => {
+        if (a.unlockedBy && Array.isArray(a.unlockedBy)) {
+          const idx = a.unlockedBy.findIndex(u => u.toLowerCase() === 'shahboz');
+          if (idx !== -1) {
+            a.unlockedBy[idx] = 'shahbozjony';
+            changed = true;
+          }
+        }
+      });
+      if (changed) localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(achs));
+    }
+  } catch(e) {}
+
   // Check active session
-  const activeSession = localStorage.getItem(APP_SESSION_KEY);
+  let activeSession = localStorage.getItem(APP_SESSION_KEY);
+  if (activeSession && activeSession.toLowerCase() === 'shahboz') {
+    activeSession = 'shahbozjony';
+    localStorage.setItem(APP_SESSION_KEY, 'shahbozjony');
+  }
+
   if (activeSession && users[activeSession.toLowerCase()]) {
     currentUser = users[activeSession.toLowerCase()];
     ensureUserDefaults();
     showMainScreen();
   } else {
-    // If no active session, show auth screen
     showAuthScreen();
   }
 }
@@ -343,7 +388,9 @@ function showAuthScreen() {
   if (authEl) authEl.classList.remove('hidden');
   if (mainEl) mainEl.classList.add('hidden');
   const userInp = document.getElementById('loginUsername');
-  if (userInp) userInp.value = 'shahbozjony';
+  if (userInp) userInp.value = '';
+  const passInp = document.getElementById('loginPassword');
+  if (passInp) passInp.value = '';
   switchAuthTab('login');
 }
 
@@ -416,17 +463,19 @@ function handleLoginSubmit(e) {
   const passwordInput = (document.getElementById('loginPassword').value || '').trim();
   const errEl = document.getElementById('loginError');
 
+  if (usernameInput === 'shahboz') {
+    if (errEl) {
+      errEl.textContent = 'Логин "shahboz" перенесен в "shahbozjony". Введите логин shahbozjony.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
   const users = getAllUsers();
   let user = users[usernameInput];
 
-  // Aliases for Shahboz: allow both shahbozjony and shahboz
-  if (!user) {
-    if (usernameInput === 'shahbozjony' && users['shahboz']) user = users['shahboz'];
-    if (usernameInput === 'shahboz' && users['shahbozjony']) user = users['shahbozjony'];
-  }
-
-  // Fallback if not registered in usersMap
-  if (!user && (usernameInput === 'shahbozjony' || usernameInput === 'shahboz')) {
+  // Fallback for primary user shahbozjony
+  if (!user && usernameInput === 'shahbozjony') {
     user = currentUser || createDefaultUserProfile('Шахбоз', 'shahbozjony', 'Schedule2004');
     users['shahbozjony'] = user;
     saveAllUsers(users);
@@ -440,17 +489,9 @@ function handleLoginSubmit(e) {
     return;
   }
 
-  // Password validation (support Schedule2004, schedule2004, or legacy 1234)
-  const isShahboz = (usernameInput === 'shahbozjony' || usernameInput === 'shahboz' || user.username === 'shahbozjony' || user.username === 'shahboz');
   const expectedPass = user.password || 'Schedule2004';
-
   const isValidPass = (passwordInput === expectedPass) ||
-                      (passwordInput.toLowerCase() === expectedPass.toLowerCase()) ||
-                      (isShahboz && (
-                        passwordInput === 'Schedule2004' || 
-                        passwordInput.toLowerCase() === 'schedule2004' || 
-                        passwordInput === '1234'
-                      ));
+                      (passwordInput.toLowerCase() === expectedPass.toLowerCase());
 
   if (!isValidPass) {
     if (errEl) {
@@ -458,14 +499,6 @@ function handleLoginSubmit(e) {
       errEl.classList.remove('hidden');
     }
     return;
-  }
-
-  // Update credentials to canonical Schedule2004
-  if (isShahboz) {
-    user.username = 'shahbozjony';
-    user.password = 'Schedule2004';
-    users['shahbozjony'] = user;
-    saveAllUsers(users);
   }
 
   if (errEl) errEl.classList.add('hidden');
@@ -614,7 +647,10 @@ function formatCurrencyUZS(amount) {
    ========================================================= */
 
 function switchView(viewId) {
-  const views = ['viewSchedule', 'viewStudy', 'viewPushups', 'viewPenalties', 'viewReport'];
+  // If legacy viewPenalties was requested, show viewReport where penalties now reside
+  if (viewId === 'viewPenalties') viewId = 'viewReport';
+
+  const views = ['viewSchedule', 'viewStudy', 'viewPushups', 'viewAchievements', 'viewReport'];
   views.forEach(v => {
     const el = document.getElementById(v);
     if (el) {
@@ -627,6 +663,7 @@ function switchView(viewId) {
   if (targetView) {
     targetView.classList.add('active');
     targetView.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   const tabs = document.querySelectorAll('.nav-tab-item');
@@ -642,8 +679,14 @@ function switchView(viewId) {
   if (viewId === 'viewSchedule') renderSchedule();
   if (viewId === 'viewStudy') renderStudy();
   if (viewId === 'viewPushups') renderPushups();
-  if (viewId === 'viewPenalties') renderPenalties();
-  if (viewId === 'viewReport') renderReport();
+  if (viewId === 'viewAchievements') {
+    checkAutomaticAchievements();
+    renderAchievements();
+  }
+  if (viewId === 'viewReport') {
+    renderReport();
+    renderPenalties();
+  }
 }
 
 /* =========================================================
@@ -2131,6 +2174,9 @@ function renderReport() {
       exListEl.appendChild(row);
     });
   }
+
+  // Render Penalty Bank & Logs inside the report
+  renderPenalties();
 }
 
 function getScheduleSportExercises() {
@@ -3837,7 +3883,7 @@ const DEFAULT_ACHIEVEMENTS = [
     category: 'reading',
     metric: 'pages',
     target: 50,
-    unlockedBy: ['shahboz']
+    unlockedBy: ['shahbozjony']
   },
   {
     id: 'ach_book_1',
@@ -3848,7 +3894,7 @@ const DEFAULT_ACHIEVEMENTS = [
     category: 'reading',
     metric: 'books',
     target: 1,
-    unlockedBy: ['shahboz']
+    unlockedBy: ['shahbozjony']
   },
   {
     id: 'ach_read_1000',
@@ -3905,7 +3951,7 @@ const DEFAULT_ACHIEVEMENTS = [
     category: 'study',
     metric: 'study_tasks',
     target: 50,
-    unlockedBy: ['shahboz']
+    unlockedBy: ['shahbozjony']
   },
   {
     id: 'ach_pomodoro_20',
@@ -3951,7 +3997,7 @@ const DEFAULT_ACHIEVEMENTS = [
     category: 'sport',
     metric: 'reps',
     target: 100,
-    unlockedBy: ['shahboz']
+    unlockedBy: ['shahbozjony']
   },
   {
     id: 'ach_rep_1000',
@@ -3997,7 +4043,7 @@ const DEFAULT_ACHIEVEMENTS = [
     category: 'discipline',
     metric: 'clean_days',
     target: 1,
-    unlockedBy: ['shahboz']
+    unlockedBy: ['shahbozjony']
   },
   {
     id: 'ach_streak_7',
@@ -4058,7 +4104,7 @@ function initAchievements() {
 
 function checkAutomaticAchievements() {
   if (!currentUser) return;
-  const username = (currentUser.username || 'shahboz').toLowerCase();
+  const username = (currentUser.username || 'shahbozjony').toLowerCase();
   const achievements = getAchievements();
   let updated = false;
 
@@ -4147,7 +4193,7 @@ function checkAutomaticAchievements() {
 
 function updateTrophyTopBadge() {
   if (!currentUser) return;
-  const username = (currentUser.username || 'shahboz').toLowerCase();
+  const username = (currentUser.username || 'shahbozjony').toLowerCase();
   const achievements = getAchievements();
   const userUnlocked = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username));
   const badge = document.getElementById('topAchBadge');
@@ -4157,13 +4203,11 @@ function updateTrophyTopBadge() {
 }
 
 function openAchievementsModal() {
-  checkAutomaticAchievements();
-  renderAchievements();
-  document.getElementById('achievementsModal').classList.remove('hidden');
+  switchView('viewAchievements');
 }
 
 function closeAchievementsModal() {
-  document.getElementById('achievementsModal').classList.add('hidden');
+  // If called anywhere, redirect to schedule or keep in view
 }
 
 function setAchievementFilter(filter) {
@@ -4183,7 +4227,7 @@ function renderAchievements() {
   if (!container) return;
   container.innerHTML = '';
 
-  const username = currentUser ? (currentUser.username || 'shahboz').toLowerCase() : 'shahboz';
+  const username = currentUser ? (currentUser.username || 'shahbozjony').toLowerCase() : 'shahbozjony';
   const achievements = getAchievements();
 
   // Overall stats
@@ -4300,7 +4344,7 @@ function toggleAchievementForUser(achId) {
   const ach = achievements.find(a => a.id === achId);
   if (!ach) return;
 
-  const defaultSuggest = currentUser ? currentUser.username : 'shahboz';
+  const defaultSuggest = currentUser ? currentUser.username : 'shahbozjony';
   const inputUser = prompt(`🏆 Достижение: «${ach.title}»\n\nВведите логин пользователя или друга (например: alisher или ${defaultSuggest}), чтобы отметить получение или снять отметку:`, defaultSuggest);
   if (!inputUser || !inputUser.trim()) return;
 
