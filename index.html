@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=41">
+  <link rel="stylesheet" href="style.css?v=42">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -442,6 +442,16 @@
               <span>🖼️</span> Эксклюзивные Аватарки (Арт & Символы)
             </h4>
             <div class="shop-grid" id="shopAvatarsGrid">
+              <!-- Rendered by JS -->
+            </div>
+
+            <h4 style="font-size: 14px; font-weight: 800; margin: 20px 0 6px 0; color: #c084fc; display: flex; align-items: center; gap: 6px;">
+              <span>🔲</span> Эксклюзивные рамки для аватарки (Кастомный неоновый стиль)
+            </h4>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
+              ℹ️ Рамки рангов (Рекрут, Страж, Центурион, Титан, Гроссмейстер, Легенда Олимпа) выдаются исключительно за выполнение достижений. Здесь продаются уникальные авторские кастом-рамки за Coins!
+            </p>
+            <div class="shop-grid" id="shopFramesGrid">
               <!-- Rendered by JS -->
             </div>
           </div>
@@ -1031,11 +1041,12 @@
           </div>
         </div>
 
-        <!-- Sub Tabs: Gallery Photo / Text & Emoji / Shop Art -->
+        <!-- Sub Tabs: Gallery Photo / Text & Emoji / Shop Art / Frames -->
         <div class="avatar-subtabs">
           <button type="button" class="av-tab-btn active" id="avTabBtn_photo" onclick="switchAvatarSubTab('photo')">📸 Фото</button>
           <button type="button" class="av-tab-btn" id="avTabBtn_text" onclick="switchAvatarSubTab('text')">✍️ Смайл / Текст</button>
           <button type="button" class="av-tab-btn" id="avTabBtn_shop" onclick="switchAvatarSubTab('shop')">🏪 Из Магазина</button>
+          <button type="button" class="av-tab-btn" id="avTabBtn_frames" onclick="switchAvatarSubTab('frames')">🔲 Рамки</button>
         </div>
 
         <!-- SUBTAB 1: PHOTO FROM GALLERY -->
@@ -1072,6 +1083,21 @@
           <div style="margin-top: 14px; text-align: center;">
             <button type="button" class="link-btn-small" onclick="closeAvatarModal(); openShopView();" style="color: #f59e0b; font-size: 13px; font-weight: 700;">
               🛍️ Открыть Магазин наград (купить новые арты за Coins)
+            </button>
+          </div>
+        </div>
+
+        <!-- SUBTAB 4: FRAMES -->
+        <div id="avSubView_frames" class="av-subview hidden">
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+            Выберите активную рамку: рамку своего ранга за достижения или купленную кастомную рамку.
+          </div>
+          <div id="avatarFramesUnlockedGrid" class="avatar-shop-unlocked-grid">
+            <!-- Populated by JS -->
+          </div>
+          <div style="margin-top: 14px; text-align: center;">
+            <button type="button" class="link-btn-small" onclick="closeAvatarModal(); openShopView();" style="color: #c084fc; font-size: 13px; font-weight: 700;">
+              🛍️ Открыть Магазин наград (купить новые рамки за Coins)
             </button>
           </div>
         </div>
@@ -1350,6 +1376,6 @@
 
   </div>
 
-  <script src="app.js?v=41"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>
