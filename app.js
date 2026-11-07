@@ -6,14 +6,18 @@
 // Storage Keys
 const APP_DATA_KEY = 'discipline_os_data_v2';
 const LEGACY_USERS_KEY = 'discipline_os_users_v1';
+const APP_USERS_KEY = 'discipline_users_store_v2';
+const APP_SESSION_KEY = 'discipline_session_username_v2';
+const APP_ACHIEVEMENTS_KEY = 'discipline_achievements_v2';
 const DEFAULT_PENALTY_AMOUNT = 5000; // 5 000 сум
 
 // State
 let currentUser = null;
 let selectedPenaltyDate = new Date(); // Tracks viewing month in penalty tab
 let currentReportPeriod = 'all'; // 'all' | 'month' | 'week'
-let lastNotifiedMinute = ''; // Prevents duplicate TG notifications in the same minute
+let lastNotifiedMinute = '';
 let currentWorkoutDayFilter = 'today';
+let currentAchievementFilter = 'all';
 
 // Week days definition
 const WEEK_DAYS = [
@@ -102,63 +106,99 @@ const DEFAULT_BOOKS = [
   }
 ];
 
-// Initialize application on page load (Прямой вход без пароля!)
+// Initialize application on page load
 document.addEventListener('DOMContentLoaded', () => {
   initLiveClock();
+  initAchievements();
   initUserData();
   registerServiceWorker();
-  initTelegramReminderDaemon();
-  showMainScreen();
 });
 
 /* =========================================================
-   USER DATA STORAGE (Персональный доступ без пароля)
+   USER DATA STORAGE & AUTHENTICATION (ЛОГИН И ПАРОЛЬ)
    ========================================================= */
 
+function getAllUsers() {
+  try {
+    const raw = localStorage.getItem(APP_USERS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Error loading users map:', e);
+  }
+  return {};
+}
+
+function saveAllUsers(usersMap) {
+  try {
+    localStorage.setItem(APP_USERS_KEY, JSON.stringify(usersMap));
+  } catch (e) {
+    console.error('Error saving users map:', e);
+  }
+}
+
+function createDefaultUserProfile(name, username, password) {
+  const todayKey = getTodayDateKey();
+  return {
+    name: name || 'Шахбоз',
+    username: (username || 'shahboz').toLowerCase(),
+    password: password || '1234',
+    createdAt: new Date().toISOString(),
+    streak: 0,
+    categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+    scheduleSlots: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SLOTS)),
+    scheduleCompletions: {},
+    workoutLogs: {
+      [todayKey]: { status: 'pending', penalty: 0, exercises: {} }
+    },
+    exercises: JSON.parse(JSON.stringify(DEFAULT_EXERCISES)),
+    studyActivities: JSON.parse(JSON.stringify(DEFAULT_STUDY_ACTIVITIES)),
+    studyLogs: {
+      [todayKey]: { status: 'pending', activities: {}, scheduleDone: {}, scheduleSets: {}, bookPages: {} }
+    },
+    books: JSON.parse(JSON.stringify(DEFAULT_BOOKS))
+  };
+}
+
 function initUserData() {
+  let users = getAllUsers();
+
+  // If users map is empty, see if we have existing currentUser in APP_DATA_KEY or legacy
+  let existingUser = null;
   try {
     const raw = localStorage.getItem(APP_DATA_KEY);
-    if (raw) {
-      currentUser = JSON.parse(raw);
-    }
-  } catch (e) {
-    console.error('Error loading data:', e);
-  }
+    if (raw) existingUser = JSON.parse(raw);
+  } catch (e) {}
 
-  // If not yet saved in v2, load legacy profile from v1
-  if (!currentUser) {
+  if (!existingUser) {
     try {
       const legacyRaw = localStorage.getItem(LEGACY_USERS_KEY);
       if (legacyRaw) {
         const legacyUsers = JSON.parse(legacyRaw);
         const firstKey = Object.keys(legacyUsers)[0];
-        if (firstKey && legacyUsers[firstKey]) {
-          currentUser = legacyUsers[firstKey];
-        }
+        if (firstKey && legacyUsers[firstKey]) existingUser = legacyUsers[firstKey];
       }
     } catch (e) {}
   }
 
-  // If still no user, create default profile for Shahboz
-  if (!currentUser) {
-    const todayKey = getTodayDateKey();
-    currentUser = {
-      name: 'Шахбоз',
-      username: 'shahbozjony',
-      createdAt: new Date().toISOString(),
-      streak: 0,
-      categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
-      scheduleSlots: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SLOTS)),
-      scheduleCompletions: {},
-      workoutLogs: {
-        [todayKey]: { status: 'pending', penalty: 5000, exercises: {} }
-      },
-      exercises: JSON.parse(JSON.stringify(DEFAULT_EXERCISES)),
-      telegramConfig: { token: '', chatId: '', notifyBlocks: true, notifyPenalties: true }
-    };
+  if (Object.keys(users).length === 0) {
+    const defaultUser = existingUser || createDefaultUserProfile('Шахбоз', 'shahboz', '1234');
+    if (!defaultUser.username) defaultUser.username = 'shahboz';
+    if (!defaultUser.password) defaultUser.password = '1234';
+    if (!defaultUser.name) defaultUser.name = 'Шахбоз';
+    users[defaultUser.username.toLowerCase()] = defaultUser;
+    saveAllUsers(users);
   }
 
-  ensureUserDefaults();
+  // Check active session
+  const activeSession = localStorage.getItem(APP_SESSION_KEY);
+  if (activeSession && users[activeSession.toLowerCase()]) {
+    currentUser = users[activeSession.toLowerCase()];
+    ensureUserDefaults();
+    showMainScreen();
+  } else {
+    // If no active session, show auth screen
+    showAuthScreen();
+  }
 }
 
 function ensureUserDefaults() {
@@ -265,9 +305,16 @@ function saveCurrentUser() {
   if (!currentUser) return;
   try {
     localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+    const users = getAllUsers();
+    if (currentUser.username) {
+      users[currentUser.username.toLowerCase()] = currentUser;
+      saveAllUsers(users);
+    }
   } catch (e) {
     console.error('Error saving data:', e);
   }
+  checkAutomaticAchievements();
+  updateTrophyTopBadge();
 }
 
 function confirmResetData() {
@@ -283,7 +330,20 @@ function confirmResetData() {
   }
 }
 
+function showAuthScreen() {
+  const authEl = document.getElementById('authScreen');
+  const mainEl = document.getElementById('mainScreen');
+  if (authEl) authEl.classList.remove('hidden');
+  if (mainEl) mainEl.classList.add('hidden');
+  switchAuthTab('login');
+}
+
 function showMainScreen() {
+  const authEl = document.getElementById('authScreen');
+  const mainEl = document.getElementById('mainScreen');
+  if (authEl) authEl.classList.add('hidden');
+  if (mainEl) mainEl.classList.remove('hidden');
+
   try {
     ensureUserDefaults();
     renderUserProfile();
@@ -292,8 +352,185 @@ function showMainScreen() {
     renderStudy();
     renderPenalties();
     renderReport();
+    checkAutomaticAchievements();
+    updateTrophyTopBadge();
   } catch (err) {
     console.error('Error in showMainScreen:', err);
+  }
+}
+
+function switchAuthTab(tab) {
+  const btnLogin = document.getElementById('tabBtnLogin');
+  const btnReg = document.getElementById('tabBtnRegister');
+  const formLogin = document.getElementById('loginForm');
+  const formReg = document.getElementById('registerForm');
+  const errLogin = document.getElementById('loginError');
+  const errReg = document.getElementById('regError');
+
+  if (errLogin) errLogin.classList.add('hidden');
+  if (errReg) errReg.classList.add('hidden');
+
+  if (tab === 'login') {
+    if (btnLogin) btnLogin.classList.add('active');
+    if (btnReg) btnReg.classList.remove('active');
+    if (formLogin) formLogin.classList.remove('hidden');
+    if (formReg) formReg.classList.add('hidden');
+  } else {
+    if (btnReg) btnReg.classList.add('active');
+    if (btnLogin) btnLogin.classList.remove('active');
+    if (formReg) formReg.classList.remove('hidden');
+    if (formLogin) formLogin.classList.add('hidden');
+  }
+}
+
+function handleLoginSubmit(e) {
+  e.preventDefault();
+  const usernameInput = (document.getElementById('loginUsername').value || '').trim().toLowerCase();
+  const passwordInput = (document.getElementById('loginPassword').value || '').trim();
+  const errEl = document.getElementById('loginError');
+
+  const users = getAllUsers();
+  const user = users[usernameInput];
+
+  if (!user) {
+    if (errEl) {
+      errEl.textContent = 'Пользователь с таким логином не найден. Проверьте логин или зарегистрируйтесь во вкладке «Регистрация».';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const expectedPass = user.password || '1234';
+  if (passwordInput !== expectedPass) {
+    if (errEl) {
+      errEl.textContent = 'Неверный пароль! Попробуйте снова или проверьте регистр букв.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (errEl) errEl.classList.add('hidden');
+  currentUser = user;
+  localStorage.setItem(APP_SESSION_KEY, currentUser.username);
+  localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+  showMainScreen();
+}
+
+function handleRegisterSubmit(e) {
+  e.preventDefault();
+  const name = (document.getElementById('regName').value || '').trim();
+  const username = (document.getElementById('regUsername').value || '').trim().toLowerCase();
+  const pass = document.getElementById('regPassword').value;
+  const confirmPass = document.getElementById('regConfirmPassword').value;
+  const errEl = document.getElementById('regError');
+
+  if (pass !== confirmPass) {
+    if (errEl) {
+      errEl.textContent = '⚠️ Введенные пароли не совпадают! Введите одинаковый пароль дважды для подтверждения.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (pass.length < 3) {
+    if (errEl) {
+      errEl.textContent = 'Пароль должен содержать минимум 3 символа.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const users = getAllUsers();
+  if (users[username]) {
+    if (errEl) {
+      errEl.textContent = 'Этот логин уже занят! Выберите другой логин.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const newUser = createDefaultUserProfile(name, username, pass);
+  users[username] = newUser;
+  saveAllUsers(users);
+
+  currentUser = newUser;
+  localStorage.setItem(APP_SESSION_KEY, currentUser.username);
+  localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+  if (errEl) errEl.classList.add('hidden');
+  showMainScreen();
+}
+
+function handleProfileSecuritySave(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+
+  const newUsername = (document.getElementById('profileEditUsername').value || '').trim().toLowerCase();
+  const newDisplayName = (document.getElementById('profileEditDisplayName').value || '').trim();
+  const newPass = document.getElementById('profileNewPass').value;
+  const confirmPass = document.getElementById('profileConfirmPass').value;
+  const errEl = document.getElementById('profileSecurityError');
+
+  if (errEl) errEl.classList.add('hidden');
+
+  // Password confirmation check
+  if (newPass || confirmPass) {
+    if (newPass !== confirmPass) {
+      if (errEl) {
+        errEl.textContent = '⚠️ Введенные пароли не совпадают! Введите одинаковый пароль дважды для подтверждения.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+    if (newPass.length < 3) {
+      if (errEl) {
+        errEl.textContent = '⚠️ Пароль должен содержать как минимум 3 символа.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+    currentUser.password = newPass;
+  }
+
+  // Username change
+  const oldUsername = (currentUser.username || '').toLowerCase();
+  const users = getAllUsers();
+
+  if (newUsername && newUsername !== oldUsername) {
+    if (users[newUsername]) {
+      if (errEl) {
+        errEl.textContent = '⚠️ Этот логин уже занят другим пользователем!';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+    delete users[oldUsername];
+    currentUser.username = newUsername;
+    localStorage.setItem(APP_SESSION_KEY, newUsername);
+  }
+
+  if (newDisplayName) {
+    currentUser.name = newDisplayName;
+  }
+
+  users[currentUser.username.toLowerCase()] = currentUser;
+  saveAllUsers(users);
+  saveCurrentUser();
+
+  // Reset inputs
+  document.getElementById('profileNewPass').value = '';
+  document.getElementById('profileConfirmPass').value = '';
+
+  renderUserProfile();
+  alert('✅ Данные аккаунта, логин и пароль успешно сохранены!');
+  closeProfileModal();
+}
+
+function handleLogout() {
+  if (confirm('Вы действительно хотите выйти из аккаунта?')) {
+    localStorage.removeItem(APP_SESSION_KEY);
+    closeProfileModal();
+    currentUser = null;
+    showAuthScreen();
   }
 }
 
@@ -394,18 +631,17 @@ function renderUserProfile() {
   const memberSince = document.getElementById('memberSince');
   if (memberSince) memberSince.textContent = `В системе с ${createdDate.toLocaleDateString('ru-RU')}`;
 
-  // Populate Telegram inputs
-  if (currentUser.telegramConfig) {
-    const tgToken = document.getElementById('tgBotToken');
-    const tgChat = document.getElementById('tgChatId');
-    const tgBlocks = document.getElementById('tgNotifyBlocks');
-    const tgPenalties = document.getElementById('tgNotifyPenalties');
-
-    if (tgToken) tgToken.value = currentUser.telegramConfig.token || '';
-    if (tgChat) tgChat.value = currentUser.telegramConfig.chatId || '';
-    if (tgBlocks) tgBlocks.checked = currentUser.telegramConfig.notifyBlocks !== false;
-    if (tgPenalties) tgPenalties.checked = currentUser.telegramConfig.notifyPenalties !== false;
-  }
+  // Populate Security & Account inputs
+  const editUserEl = document.getElementById('profileEditUsername');
+  if (editUserEl) editUserEl.value = currentUser.username || '';
+  const editNameEl = document.getElementById('profileEditDisplayName');
+  if (editNameEl) editNameEl.value = currentUser.name || '';
+  const passEl = document.getElementById('profileNewPass');
+  if (passEl) passEl.value = '';
+  const confirmEl = document.getElementById('profileConfirmPass');
+  if (confirmEl) confirmEl.value = '';
+  const secErr = document.getElementById('profileSecurityError');
+  if (secErr) secErr.classList.add('hidden');
 }
 
 function openProfileModal() {
@@ -3528,108 +3764,503 @@ function renderTodayStudyReport() {
 }
 
 /* =========================================================
-   TELEGRAM BOT & CLOUDFLARE INTEGRATION
+   STEAM ACHIEVEMENTS SYSTEM (ДОСТИЖЕНИЯ КАК В STEAM)
    ========================================================= */
 
-function saveTelegramSettings() {
-  if (!currentUser) return;
-  const token = document.getElementById('tgBotToken').value.trim();
-  const chatId = document.getElementById('tgChatId').value.trim();
-  const notifyBlocks = document.getElementById('tgNotifyBlocks').checked;
-  const notifyPenalties = document.getElementById('tgNotifyPenalties').checked;
+const DEFAULT_ACHIEVEMENTS = [
+  // --- 📚 ЧТЕНИЕ И КНИГИ ---
+  {
+    id: 'ach_read_50',
+    icon: '📖',
+    title: 'Первые строки',
+    desc: 'Прочитать первые 50 страниц в трекере',
+    tier: 'bronze',
+    category: 'reading',
+    metric: 'pages',
+    target: 50,
+    unlockedBy: ['shahboz']
+  },
+  {
+    id: 'ach_book_1',
+    icon: '📕',
+    title: 'Книжный дебют',
+    desc: 'Полностью прочитать 1-ю книгу',
+    tier: 'bronze',
+    category: 'reading',
+    metric: 'books',
+    target: 1,
+    unlockedBy: ['shahboz']
+  },
+  {
+    id: 'ach_read_1000',
+    icon: '📚',
+    title: 'Книжный червь',
+    desc: 'Прочитать суммарно 1 000 страниц',
+    tier: 'silver',
+    category: 'reading',
+    metric: 'pages',
+    target: 1000,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_book_10',
+    icon: '🏆',
+    title: 'Книжная полка',
+    desc: 'Полностью прочитать 10 книг',
+    tier: 'silver',
+    category: 'reading',
+    metric: 'books',
+    target: 10,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_read_5000',
+    icon: '🧙‍♂️',
+    title: 'Библиотекарь',
+    desc: 'Прочитать 5 000 страниц полезной литературы',
+    tier: 'gold',
+    category: 'reading',
+    metric: 'pages',
+    target: 5000,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_book_100',
+    icon: '👑',
+    title: 'Легенда чтения',
+    desc: 'Закончить 100 книг (элитный читательский клуб)',
+    tier: 'platinum',
+    category: 'reading',
+    metric: 'books',
+    target: 100,
+    unlockedBy: []
+  },
 
-  currentUser.telegramConfig = {
-    token,
-    chatId,
-    notifyBlocks,
-    notifyPenalties
-  };
+  // --- 📑 УЧЁБА И ACCA ---
+  {
+    id: 'ach_study_50',
+    icon: '📑',
+    title: 'Студент ACCA',
+    desc: 'Разобрать первые 50 задач или учебных тем',
+    tier: 'bronze',
+    category: 'study',
+    metric: 'study_tasks',
+    target: 50,
+    unlockedBy: ['shahboz']
+  },
+  {
+    id: 'ach_pomodoro_20',
+    icon: '⏱️',
+    title: 'Мастер концентрации',
+    desc: 'Провести 20 учебных сессий по расписанию',
+    tier: 'silver',
+    category: 'study',
+    metric: 'study_sessions',
+    target: 20,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_acca_500',
+    icon: '🧠',
+    title: 'Экзаменационный штурм',
+    desc: 'Решить 500 задач из Exam Kit (BPP / Kaplan)',
+    tier: 'gold',
+    category: 'study',
+    metric: 'study_tasks',
+    target: 500,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_acca_master',
+    icon: '💎',
+    title: 'Член ассоциации (ACCA Master)',
+    desc: 'Завершить всю программу подготовки к экзамену ACCA',
+    tier: 'platinum',
+    category: 'study',
+    metric: 'study_master',
+    target: 1,
+    unlockedBy: []
+  },
 
-  saveCurrentUser();
-  alert('Настройки Telegram-бота успешно сохранены!');
+  // --- 💪 СПОРТ И ТРЕНИРОВКИ ---
+  {
+    id: 'ach_rep_100',
+    icon: '💥',
+    title: 'Первая кровь',
+    desc: 'Сделать первые 100 отжиманий суммарно',
+    tier: 'bronze',
+    category: 'sport',
+    metric: 'reps',
+    target: 100,
+    unlockedBy: ['shahboz']
+  },
+  {
+    id: 'ach_rep_1000',
+    icon: '🏋️',
+    title: 'Железная сотня',
+    desc: 'Сделать 1 000 повторений упражнений',
+    tier: 'silver',
+    category: 'sport',
+    metric: 'reps',
+    target: 1000,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_rep_5000',
+    icon: '⚔️',
+    title: 'Спартанец',
+    desc: 'Сделать 5 000 чистых повторений',
+    tier: 'gold',
+    category: 'sport',
+    metric: 'reps',
+    target: 5000,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_rep_10000',
+    icon: '🦾',
+    title: 'Титановый атлет',
+    desc: 'Сделать 10 000 чистых повторений (машина дисциплины)',
+    tier: 'platinum',
+    category: 'sport',
+    metric: 'reps',
+    target: 10000,
+    unlockedBy: []
+  },
+
+  // --- ⚡ ДИСЦИПЛИНА И РАСПИСАНИЕ ---
+  {
+    id: 'ach_clean_day',
+    icon: '🛡️',
+    title: 'Чистый лист',
+    desc: 'Закрыть день по расписанию без единого штрафа',
+    tier: 'bronze',
+    category: 'discipline',
+    metric: 'clean_days',
+    target: 1,
+    unlockedBy: ['shahboz']
+  },
+  {
+    id: 'ach_streak_7',
+    icon: '🔥',
+    title: 'Неделя без пощады',
+    desc: 'Удержать 7 дней дисциплинарного стрика',
+    tier: 'silver',
+    category: 'discipline',
+    metric: 'streak',
+    target: 7,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_streak_30',
+    icon: '🌟',
+    title: 'Месяц стали',
+    desc: '30 дней непрерывного соблюдения расписания',
+    tier: 'gold',
+    category: 'discipline',
+    metric: 'streak',
+    target: 30,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_streak_100',
+    icon: '👑',
+    title: 'Властелин времени',
+    desc: '100 дней железной дисциплины и 0 сум штрафов',
+    tier: 'platinum',
+    category: 'discipline',
+    metric: 'streak',
+    target: 100,
+    unlockedBy: []
+  }
+];
+
+function getAchievements() {
+  try {
+    const raw = localStorage.getItem(APP_ACHIEVEMENTS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_ACHIEVEMENTS));
 }
 
-async function sendTelegramNotification(messageText) {
-  if (!currentUser || !currentUser.telegramConfig) return;
-  const { token, chatId } = currentUser.telegramConfig;
-  if (!token || !chatId) return;
-
+function saveAchievements(catalog) {
   try {
-    const isWorkerUrl = token.startsWith('http://') || token.startsWith('https://');
-    let endpoint = isWorkerUrl ? token : `https://api.telegram.org/bot${token}/sendMessage`;
+    localStorage.setItem(APP_ACHIEVEMENTS_KEY, JSON.stringify(catalog));
+  } catch (e) {}
+}
 
-    const payload = isWorkerUrl 
-      ? { chatId: chatId, message: messageText }
-      : { chat_id: chatId, text: messageText, parse_mode: 'HTML' };
+function initAchievements() {
+  const existing = localStorage.getItem(APP_ACHIEVEMENTS_KEY);
+  if (!existing) {
+    saveAchievements(DEFAULT_ACHIEVEMENTS);
+  }
+  updateTrophyTopBadge();
+}
 
-    await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+function checkAutomaticAchievements() {
+  if (!currentUser) return;
+  const username = (currentUser.username || 'shahboz').toLowerCase();
+  const achievements = getAchievements();
+  let updated = false;
+
+  // Compute stats
+  let totalPagesRead = 0;
+  (currentUser.books || []).forEach(b => {
+    totalPagesRead += (parseInt(b.currentPage, 10) || 0);
+  });
+  if (currentUser.studyLogs) {
+    Object.values(currentUser.studyLogs).forEach(log => {
+      if (log.bookPages) {
+        Object.values(log.bookPages).forEach(p => { totalPagesRead += (parseInt(p, 10) || 0); });
+      }
     });
-  } catch (err) {
-    console.error('Telegram notification error:', err);
+  }
+
+  let booksCompleted = 0;
+  (currentUser.books || []).forEach(b => {
+    if (b.status === 'completed' || (parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10))) {
+      booksCompleted++;
+    }
+  });
+
+  let totalReps = 0;
+  if (currentUser.workoutLogs) {
+    Object.values(currentUser.workoutLogs).forEach(log => {
+      if (log.exercises) {
+        Object.values(log.exercises).forEach(ex => {
+          totalReps += (parseInt(ex.done, 10) || 0);
+        });
+      }
+    });
+  }
+
+  let totalStudyTasks = 0;
+  let totalStudySessions = 0;
+  if (currentUser.studyLogs) {
+    Object.values(currentUser.studyLogs).forEach(log => {
+      if (log.scheduleDone) {
+        Object.values(log.scheduleDone).forEach(val => { totalStudyTasks += (parseInt(val, 10) || 0); });
+      }
+      if (log.scheduleSets) {
+        Object.values(log.scheduleSets).forEach(arr => {
+          if (Array.isArray(arr)) totalStudySessions += arr.filter(v => v > 0).length;
+        });
+      }
+    });
+  }
+
+  let cleanDays = 0;
+  if (currentUser.workoutLogs) {
+    Object.values(currentUser.workoutLogs).forEach(log => {
+      if (log.status === 'success' || (log.penalty === 0 && log.exercises && Object.keys(log.exercises).length > 0)) {
+        cleanDays++;
+      }
+    });
+  }
+
+  const streak = currentUser.streak || currentUser.studyStreak || 0;
+
+  achievements.forEach(ach => {
+    if (!ach.unlockedBy) ach.unlockedBy = [];
+    const isUnlocked = ach.unlockedBy.some(u => u.toLowerCase() === username);
+    if (!isUnlocked) {
+      let meetsCondition = false;
+      if (ach.metric === 'pages' && totalPagesRead >= ach.target) meetsCondition = true;
+      if (ach.metric === 'books' && booksCompleted >= ach.target) meetsCondition = true;
+      if (ach.metric === 'reps' && totalReps >= ach.target) meetsCondition = true;
+      if (ach.metric === 'study_tasks' && totalStudyTasks >= ach.target) meetsCondition = true;
+      if (ach.metric === 'study_sessions' && totalStudySessions >= ach.target) meetsCondition = true;
+      if (ach.metric === 'clean_days' && cleanDays >= ach.target) meetsCondition = true;
+      if (ach.metric === 'streak' && streak >= ach.target) meetsCondition = true;
+
+      if (meetsCondition) {
+        ach.unlockedBy.push(username);
+        updated = true;
+      }
+    }
+  });
+
+  if (updated) {
+    saveAchievements(achievements);
+    playHapticSound('targetAchieved');
   }
 }
 
-async function sendTestTelegramMessage() {
+function updateTrophyTopBadge() {
   if (!currentUser) return;
-  const token = document.getElementById('tgBotToken').value.trim();
-  const chatId = document.getElementById('tgChatId').value.trim();
+  const username = (currentUser.username || 'shahboz').toLowerCase();
+  const achievements = getAchievements();
+  const userUnlocked = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username));
+  const badge = document.getElementById('topAchBadge');
+  if (badge) {
+    badge.textContent = userUnlocked.length;
+  }
+}
 
-  if (!token || !chatId) {
-    alert('Пожалуйста, введите токен бота (или URL воркера) и ваш Chat ID!');
+function openAchievementsModal() {
+  checkAutomaticAchievements();
+  renderAchievements();
+  document.getElementById('achievementsModal').classList.remove('hidden');
+}
+
+function closeAchievementsModal() {
+  document.getElementById('achievementsModal').classList.add('hidden');
+}
+
+function setAchievementFilter(filter) {
+  currentAchievementFilter = filter;
+  ['all', 'reading', 'study', 'sport', 'discipline', 'unlocked'].forEach(f => {
+    const btn = document.getElementById(`achFilter_${f}`);
+    if (btn) {
+      if (f === filter) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+  renderAchievements();
+}
+
+function renderAchievements() {
+  const container = document.getElementById('steamAchievementsList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const username = currentUser ? (currentUser.username || 'shahboz').toLowerCase() : 'shahboz';
+  const achievements = getAchievements();
+
+  // Overall stats
+  const totalCount = achievements.length;
+  const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username)).length;
+  const overallPct = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
+
+  const counterEl = document.getElementById('steamTrophyCounter');
+  if (counterEl) counterEl.textContent = `${unlockedCount} / ${totalCount} (${overallPct}%)`;
+
+  const barEl = document.getElementById('steamOverallProgressBar');
+  if (barEl) barEl.style.width = `${overallPct}%`;
+
+  updateTrophyTopBadge();
+
+  // Filter
+  const filtered = achievements.filter(ach => {
+    if (currentAchievementFilter === 'all') return true;
+    if (currentAchievementFilter === 'unlocked') return (ach.unlockedBy || []).some(u => u.toLowerCase() === username);
+    return ach.category === currentAchievementFilter;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 24px; text-align: center; color: var(--text-dim); font-size: 13px;">
+        В этой категории достижений пока не найдено.
+      </div>
+    `;
     return;
   }
 
-  try {
-    const isWorkerUrl = token.startsWith('http://') || token.startsWith('https://');
-    let endpoint = isWorkerUrl ? token : `https://api.telegram.org/bot${token}/sendMessage`;
-
-    const payload = isWorkerUrl 
-      ? { chatId: chatId, message: `🔥 Привет, ${currentUser.name}! Связь с твоим Telegram-ботом на Cloudflare успешно установлена! Дисциплина OS на связи.` }
-      : { chat_id: chatId, text: `🔥 <b>Привет, ${currentUser.name}!</b>\n\nСвязь с твоим Telegram-ботом на Cloudflare успешно установлена! Дисциплина OS на связи. 💪`, parse_mode: 'HTML' };
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+  // Get current user progress stats for display
+  let totalPagesRead = 0;
+  (currentUser.books || []).forEach(b => { totalPagesRead += (parseInt(b.currentPage, 10) || 0); });
+  let booksCompleted = (currentUser.books || []).filter(b => b.status === 'completed' || parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10)).length;
+  let totalReps = 0;
+  if (currentUser.workoutLogs) {
+    Object.values(currentUser.workoutLogs).forEach(l => {
+      if (l.exercises) Object.values(l.exercises).forEach(e => { totalReps += (parseInt(e.done, 10) || 0); });
     });
-
-    if (res.ok) {
-      alert('Успех! Тестовое сообщение отправлено в ваш Telegram!');
-    } else {
-      alert('Ошибка при отправке. Проверьте правильность токена и Chat ID.');
-    }
-  } catch (e) {
-    alert('Не удалось отправить сообщение. Проверьте подключение к интернету или URL Cloudflare воркера.');
   }
+
+  filtered.forEach(ach => {
+    const isUnlocked = (ach.unlockedBy || []).some(u => u.toLowerCase() === username);
+    const tierLabels = {
+      bronze: '🥉 Бронза',
+      silver: '🥈 Серебро',
+      gold: '🥇 Золото',
+      platinum: '💎 Платина'
+    };
+
+    // Calculate progress value
+    let curVal = 0;
+    if (ach.metric === 'pages') curVal = totalPagesRead;
+    else if (ach.metric === 'books') curVal = booksCompleted;
+    else if (ach.metric === 'reps') curVal = totalReps;
+    else if (ach.metric === 'streak') curVal = currentUser.streak || 0;
+    else curVal = isUnlocked ? ach.target : 0;
+
+    const progPct = Math.min(100, Math.round((curVal / ach.target) * 100));
+
+    // Users list
+    const usersChipsHtml = (ach.unlockedBy && ach.unlockedBy.length > 0)
+      ? ach.unlockedBy.map(u => `<span class="steam-user-chip">👤 @${escapeHtml(u)}</span>`).join('')
+      : '<span style="color: var(--text-dim);">Пока никто не достиг</span>';
+
+    const card = document.createElement('div');
+    card.className = `steam-ach-card tier-${ach.tier} ${isUnlocked ? 'unlocked' : 'locked'}`;
+    card.innerHTML = `
+      <div class="steam-ach-main">
+        <div class="steam-ach-icon-box" title="${isUnlocked ? 'Разблокировано!' : 'Заблокировано'}">
+          ${isUnlocked ? ach.icon : '🔒'}
+        </div>
+        <div class="steam-ach-info">
+          <div class="steam-ach-header">
+            <span class="steam-tier-badge">${tierLabels[ach.tier] || ach.tier}</span>
+            <span style="font-size: 11px; font-weight: 700; color: ${isUnlocked ? 'var(--accent-green)' : 'var(--text-dim)'};">
+              ${isUnlocked ? '✓ Разблокировано 🏆' : '🔒 Заблокировано'}
+            </span>
+          </div>
+          <div class="steam-ach-title">${escapeHtml(ach.title)}</div>
+          <div class="steam-ach-desc">${escapeHtml(ach.desc)}</div>
+
+          <div class="steam-ach-progress-wrap">
+            <div class="steam-ach-progress-text">
+              <span>Прогресс: <b>${Math.min(curVal, ach.target)}</b> / <b>${ach.target}</b></span>
+              <span>${progPct}%</span>
+            </div>
+            <div class="today-rep-bar-bg" style="height: 6px;">
+              <div class="today-rep-bar-fill" style="width: ${progPct}%; background: ${isUnlocked ? 'var(--accent-green)' : 'linear-gradient(90deg, #6366f1, #06b6d4)'};"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="steam-users-section">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span style="font-weight: 700; color: var(--text-muted);">🏆 Получили:</span>
+          <div class="steam-users-chips-list">
+            ${usersChipsHtml}
+          </div>
+        </div>
+        <button type="button" class="steam-tag-btn" onclick="toggleAchievementForUser('${ach.id}')" title="Добавить или снять пользователя с этого достижения">
+          + Отметить пользователя
+        </button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
 }
 
-function initTelegramReminderDaemon() {
-  setInterval(() => {
-    if (!currentUser || !currentUser.telegramConfig || !currentUser.telegramConfig.notifyBlocks) return;
+function toggleAchievementForUser(achId) {
+  const achievements = getAchievements();
+  const ach = achievements.find(a => a.id === achId);
+  if (!ach) return;
 
-    const now = new Date();
-    const currentHM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const defaultSuggest = currentUser ? currentUser.username : 'shahboz';
+  const inputUser = prompt(`🏆 Достижение: «${ach.title}»\n\nВведите логин пользователя или друга (например: alisher или ${defaultSuggest}), чтобы отметить получение или снять отметку:`, defaultSuggest);
+  if (!inputUser || !inputUser.trim()) return;
 
-    if (lastNotifiedMinute === currentHM) return;
+  const cleanUser = inputUser.trim().replace('@', '').toLowerCase();
+  if (!ach.unlockedBy) ach.unlockedBy = [];
 
-    const slots = currentUser.scheduleSlots || [];
-    const matchedSlot = slots.find(s => s.start === currentHM);
-
-    if (matchedSlot) {
-      lastNotifiedMinute = currentHM;
-      let exText = '';
-      if (matchedSlot.exercises && matchedSlot.exercises.length > 0) {
-        exText = '\n\n🎯 <b>Цели блока:</b>\n' + matchedSlot.exercises.map(ex => `• ${ex.name}: ${ex.sets} подх. × ${ex.target} ${ex.unit}`).join('\n');
-      }
-
-      const msg = `🔔 <b>Время пришло: ${matchedSlot.start}!</b>\n\n<b>${matchedSlot.name}</b>\n(до ${matchedSlot.end})${exText}\n\n⚠️ <i>Штраф при пропуске: ${formatCurrencyUZS(matchedSlot.penalty || 5000)}</i>`;
-      sendTelegramNotification(msg);
-      playHapticSound('targetAchieved');
+  const existingIdx = ach.unlockedBy.findIndex(u => u.toLowerCase() === cleanUser);
+  if (existingIdx >= 0) {
+    if (confirm(`Пользователь @${cleanUser} уже имеет это достижение.\n\nСнять достижение с @${cleanUser}?`)) {
+      ach.unlockedBy.splice(existingIdx, 1);
     }
-  }, 30000); // Check every 30 seconds
+  } else {
+    ach.unlockedBy.push(cleanUser);
+    playHapticSound('targetAchieved');
+    alert(`🎉 Достижение «${ach.title}» успешно присвоено пользователю @${cleanUser}!`);
+  }
+
+  saveAchievements(achievements);
+  renderAchievements();
 }
 
 function requestWebNotificationPermission() {
