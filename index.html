@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=28">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -103,7 +103,7 @@
       <!-- Top App Bar -->
       <header class="top-bar">
         <div class="user-greeting" onclick="openProfileModal()" style="cursor: pointer;" title="Открыть профиль и настройки">
-          <div class="avatar" id="userAvatar">S</div>
+          <div class="avatar" id="userAvatar" onclick="event.stopPropagation(); openAvatarModal();" title="Сменить аватарку">S</div>
           <div>
             <div class="date-str" id="currentDateStr">25 октября, Воскресенье</div>
             <div class="user-name-title">Привет, <span id="displayName">Шахбоз</span> 👋</div>
@@ -425,6 +425,13 @@
               <span>⚡</span> Значки в логин (как в Telegram Plus)
             </h4>
             <div class="shop-grid" id="shopBadgesGrid">
+              <!-- Rendered by JS -->
+            </div>
+
+            <h4 style="font-size: 14px; font-weight: 800; margin: 20px 0 10px 0; color: #f59e0b; display: flex; align-items: center; gap: 6px;">
+              <span>🖼️</span> Эксклюзивные Аватарки (Арт & Символы)
+            </h4>
+            <div class="shop-grid" id="shopAvatarsGrid">
               <!-- Rendered by JS -->
             </div>
           </div>
@@ -761,11 +768,19 @@
     <div id="profileModal" class="modal-overlay hidden">
       <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto;">
         <div class="modal-handle"></div>
-        <div class="profile-card" style="padding: 16px; margin-bottom: 12px;">
-          <div class="big-avatar" id="profileBigAvatar" style="width: 58px; height: 58px; font-size: 26px;">S</div>
+        <div class="profile-card" style="padding: 16px; margin-bottom: 12px; text-align: center;">
+          <div style="position: relative; display: inline-block; margin: 0 auto 8px;">
+            <div class="big-avatar" id="profileBigAvatar" onclick="openAvatarModal()" style="cursor: pointer;" title="Нажмите, чтобы сменить аватарку">S</div>
+            <button type="button" class="avatar-edit-badge" onclick="openAvatarModal()" title="Сменить аватарку">📷</button>
+          </div>
           <h2 id="profileName" style="font-size: 18px;">Шахбоз</h2>
           <div class="profile-username" id="profileUsername">@shahbozjony</div>
-          <div class="member-since" id="memberSince">В системе с 2026 года</div>
+          <div style="margin-top: 8px;">
+            <button type="button" class="link-btn-small" onclick="openAvatarModal()" style="font-size: 12px; color: #a5b4fc; background: rgba(99, 102, 241, 0.15); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.3); display: inline-flex; align-items: center; gap: 4px;">
+              📷 Сменить аватарку (фото / смайл / магазин)
+            </button>
+          </div>
+          <div class="member-since" id="memberSince" style="margin-top: 6px;">В системе с 2026 года</div>
         </div>
 
         <!-- SECURITY & ACCOUNT SETTINGS (СМЕНА ЛОГИНА И ПАРОЛЯ С ДВОЙНЫМ ВВОДОМ) -->
@@ -871,6 +886,80 @@
         </div>
 
         <button type="button" class="cancel-btn" style="width: 100%;" onclick="closeProfileModal()">Закрыть настройки</button>
+      </div>
+    </div>
+
+    <!-- MODAL: CHANGE AVATAR -->
+    <div id="avatarModal" class="modal-overlay hidden">
+      <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto; overflow-x: hidden;">
+        <div class="modal-handle"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <h3 style="font-size: 17px; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+            <span>🖼️</span> Выбор аватарки
+          </h3>
+          <button type="button" class="link-btn-small" onclick="closeAvatarModal()" style="color: var(--text-dim); font-size: 14px;">✕</button>
+        </div>
+        <p class="modal-sub" style="margin-bottom: 12px;">Загрузите своё фото, введите смайлик или выберите арт из Магазина</p>
+
+        <!-- Current Live Preview -->
+        <div class="avatar-preview-container">
+          <div id="avatarModalPreview" class="avatar-modal-big-preview"></div>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 700; color: #f8fafc;" id="avatarPreviewTitle">Ваша аватарка</div>
+            <div style="font-size: 11px; color: var(--text-muted);" id="avatarPreviewSubtitle">Отображается в профиле и онлайн-рейтинге</div>
+          </div>
+        </div>
+
+        <!-- Sub Tabs: Gallery Photo / Text & Emoji / Shop Art -->
+        <div class="avatar-subtabs">
+          <button type="button" class="av-tab-btn active" id="avTabBtn_photo" onclick="switchAvatarSubTab('photo')">📸 Фото</button>
+          <button type="button" class="av-tab-btn" id="avTabBtn_text" onclick="switchAvatarSubTab('text')">✍️ Смайл / Текст</button>
+          <button type="button" class="av-tab-btn" id="avTabBtn_shop" onclick="switchAvatarSubTab('shop')">🏪 Из Магазина</button>
+        </div>
+
+        <!-- SUBTAB 1: PHOTO FROM GALLERY -->
+        <div id="avSubView_photo" class="av-subview">
+          <div class="av-upload-box" onclick="document.getElementById('avatarFileInput').click()">
+            <div style="font-size: 32px; margin-bottom: 6px;">📁</div>
+            <div style="font-weight: 700; font-size: 14px; color: #a5b4fc;">Выбрать фото из галереи</div>
+            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">JPG, PNG, WebP (любое фото с камеры или файлов)</div>
+            <input type="file" id="avatarFileInput" accept="image/*" style="display: none;" onchange="handleAvatarFileSelect(event)">
+          </div>
+          <div id="avatarPhotoActionRow" class="hidden" style="margin-top: 12px;">
+            <button type="button" class="primary-btn" style="width: 100%;" onclick="applyUploadedAvatarPhoto()">Сохранить это фото как аватарку ✓</button>
+          </div>
+        </div>
+
+        <!-- SUBTAB 2: TEXT & EMOJI -->
+        <div id="avSubView_text" class="av-subview hidden">
+          <div class="input-group" style="margin-bottom: 12px;">
+            <label>Смайлик, буквы или цифры (до 3 символов)</label>
+            <input type="text" id="avatarTextInput" maxlength="3" placeholder="Например: 🔥, Ш, 77, ⚡, 👑" oninput="updateAvatarTextPreview()" style="font-size: 18px; text-align: center; font-weight: 800;">
+          </div>
+          <label style="font-size: 12px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 6px;">Цвет и градиент фона:</label>
+          <div class="avatar-bg-palette" id="avatarBgPalette">
+            <!-- Populated by JS -->
+          </div>
+          <button type="button" class="primary-btn" style="width: 100%; margin-top: 14px;" onclick="applyCustomTextAvatar()">Установить этот символ ✓</button>
+        </div>
+
+        <!-- SUBTAB 3: SHOP ART -->
+        <div id="avSubView_shop" class="av-subview hidden">
+          <div id="avatarShopUnlockedGrid" class="avatar-shop-unlocked-grid">
+            <!-- Populated by JS -->
+          </div>
+          <div style="margin-top: 14px; text-align: center;">
+            <button type="button" class="link-btn-small" onclick="closeAvatarModal(); openShopView();" style="color: #f59e0b; font-size: 13px; font-weight: 700;">
+              🛍️ Открыть Магазин наград (купить новые арты за Coins)
+            </button>
+          </div>
+        </div>
+
+        <!-- Reset & Close -->
+        <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 14px; display: flex; gap: 8px;">
+          <button type="button" class="cancel-btn" style="flex: 1;" onclick="resetAvatarToDefault()">Сбросить на букву</button>
+          <button type="button" class="cancel-btn" style="flex: 1;" onclick="closeAvatarModal()">Закрыть</button>
+        </div>
       </div>
     </div>
 
@@ -1115,6 +1204,6 @@
 
   </div>
 
-  <script src="app.js?v=27"></script>
+  <script src="app.js?v=28"></script>
 </body>
 </html>
