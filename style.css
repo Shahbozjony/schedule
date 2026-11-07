@@ -2479,3 +2479,223 @@ body {
   font-weight: 600;
   color: var(--text-muted);
 }
+
+/* =========================================================
+   STEAM ACHIEVEMENTS STYLES
+   ========================================================= */
+.ach-count-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  min-width: 16px;
+  text-align: center;
+  line-height: 14px;
+}
+
+.steam-hero-card {
+  background: linear-gradient(135deg, #1e1b4b, #0f172a);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.steam-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.steam-trophy-counter {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.15);
+}
+
+.steam-badge-tag {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.steam-achievements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.steam-ach-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.steam-ach-card.unlocked {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.steam-ach-card.tier-bronze.unlocked {
+  border-color: rgba(205, 127, 50, 0.6);
+  box-shadow: 0 0 14px rgba(205, 127, 50, 0.15);
+}
+
+.steam-ach-card.tier-silver.unlocked {
+  border-color: rgba(148, 163, 184, 0.6);
+  box-shadow: 0 0 14px rgba(148, 163, 184, 0.2);
+}
+
+.steam-ach-card.tier-gold.unlocked {
+  border-color: rgba(245, 158, 11, 0.7);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.25);
+}
+
+.steam-ach-card.tier-platinum.unlocked {
+  border-color: rgba(168, 85, 247, 0.8);
+  box-shadow: 0 0 22px rgba(168, 85, 247, 0.35);
+}
+
+.steam-ach-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.steam-ach-icon-box {
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+}
+
+.steam-ach-card.unlocked .steam-ach-icon-box {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.steam-ach-card.locked .steam-ach-icon-box {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.steam-ach-info {
+  flex: 1;
+}
+
+.steam-ach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.steam-tier-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.tier-bronze .steam-tier-badge { background: rgba(205, 127, 50, 0.2); color: #cd7f32; border: 1px solid rgba(205, 127, 50, 0.4); }
+.tier-silver .steam-tier-badge { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); }
+.tier-gold .steam-tier-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.5); }
+.tier-platinum .steam-tier-badge { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.5); }
+
+.steam-ach-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 3px;
+}
+
+.steam-ach-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.steam-ach-progress-wrap {
+  margin-top: 6px;
+}
+
+.steam-ach-progress-text {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.steam-users-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+}
+
+.steam-users-chips-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.steam-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.steam-tag-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.steam-tag-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+}
