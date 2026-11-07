@@ -1212,7 +1212,7 @@ function getUserLevelData(user) {
   };
 }
 
-function getAvatarHtml(userOrAvatar, size = 38) {
+function getAvatarHtml(userOrAvatar, size = 38, forcedFrameClass = null) {
   let av = null;
   let initial = 'Ш';
   let targetUser = null;
@@ -1227,8 +1227,18 @@ function getAvatarHtml(userOrAvatar, size = 38) {
   }
 
   const lvl = getUserLevelData(targetUser);
-  const frameClass = lvl ? lvl.frameClass : 'lvl-frame-1';
-  const frameTitle = lvl ? `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/60 достижений)` : '';
+  let frameClass = lvl ? lvl.frameClass : 'lvl-frame-1';
+  let frameTitle = lvl ? `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/60 достижений)` : '';
+
+  if (forcedFrameClass) {
+    frameClass = forcedFrameClass;
+  } else if (targetUser && targetUser.equippedFrame) {
+    frameClass = targetUser.equippedFrame;
+    const shopFrame = (typeof SHOP_ITEMS !== 'undefined') ? SHOP_ITEMS.find(i => i.category === 'frame' && i.cssClass === targetUser.equippedFrame) : null;
+    if (shopFrame) {
+      frameTitle = `${shopFrame.name} • ${frameTitle}`;
+    }
+  }
 
   let innerHtml = '';
   // 1. Gallery uploaded photo (data URL)
@@ -1742,6 +1752,7 @@ function openAvatarModal() {
   initAvatarPalette();
   updateAvatarModalPreview();
   renderAvatarShopUnlocked();
+  renderAvatarFramesUnlocked();
   switchAvatarSubTab('photo');
 
   document.getElementById('avatarModal').classList.remove('hidden');
@@ -1752,12 +1763,13 @@ function closeAvatarModal() {
 }
 
 function switchAvatarSubTab(subTab) {
-  ['photo', 'text', 'shop'].forEach(t => {
+  ['photo', 'text', 'shop', 'frames'].forEach(t => {
     const btn = document.getElementById(`avTabBtn_${t}`);
     const view = document.getElementById(`avSubView_${t}`);
     if (btn) btn.classList.toggle('active', t === subTab);
     if (view) view.classList.toggle('hidden', t !== subTab);
   });
+  if (subTab === 'frames') renderAvatarFramesUnlocked();
   updateAvatarModalPreview();
 }
 
@@ -1919,6 +1931,73 @@ function selectShopAvatarFromModal(itemId) {
   renderAvatarShopUnlocked();
   playHapticSound('targetAchieved');
   alert('🎉 Эксклюзивная аватарка из Магазина успешно надета!');
+}
+
+function renderAvatarFramesUnlocked() {
+  const grid = document.getElementById('avatarFramesUnlockedGrid');
+  if (!grid || !currentUser) return;
+  grid.innerHTML = '';
+
+  const lvl = getUserLevelData(currentUser);
+  const inventory = currentUser.inventory || [];
+  const equippedFrame = currentUser.equippedFrame || '';
+
+  // 1. Base Achievement Level Frame (Rank frame)
+  const isRankEquipped = !equippedFrame;
+  const rankCard = document.createElement('div');
+  rankCard.className = `av-shop-unlocked-card ${isRankEquipped ? 'equipped' : ''}`;
+  rankCard.innerHTML = `
+    ${getAvatarHtml(currentUser, 44, lvl ? lvl.frameClass : 'lvl-frame-1')}
+    <div style="flex: 1; min-width: 0;">
+      <div style="font-size: 12px; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        🏆 Рамка ранга (${lvl ? lvl.title : 'Рекрут'})
+      </div>
+      <div style="font-size: 10px; color: ${isRankEquipped ? '#10b981' : 'var(--text-dim)'};">
+        ${isRankEquipped ? '✓ Надет (Текущий ранг)' : 'Нажмите, чтобы надеть'}
+      </div>
+    </div>
+  `;
+  rankCard.onclick = () => {
+    selectAvatarFrameFromModal('');
+  };
+  grid.appendChild(rankCard);
+
+  // 2. Purchased custom frames
+  const shopFrames = (typeof SHOP_ITEMS !== 'undefined') ? SHOP_ITEMS.filter(i => i.category === 'frame') : [];
+  const ownedFrames = shopFrames.filter(i => inventory.includes(i.id));
+
+  ownedFrames.forEach(item => {
+    const isEquipped = equippedFrame === item.cssClass;
+    const card = document.createElement('div');
+    card.className = `av-shop-unlocked-card ${isEquipped ? 'equipped' : ''}`;
+    card.innerHTML = `
+      ${getAvatarHtml(currentUser, 44, item.cssClass)}
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 12px; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${item.name}
+        </div>
+        <div style="font-size: 10px; color: ${isEquipped ? '#10b981' : 'var(--text-dim)'};">
+          ${isEquipped ? '✓ Надет' : 'Нажмите, чтобы надеть'}
+        </div>
+      </div>
+    `;
+    card.onclick = () => {
+      selectAvatarFrameFromModal(item.cssClass);
+    };
+    grid.appendChild(card);
+  });
+}
+
+function selectAvatarFrameFromModal(frameCssClass) {
+  if (!currentUser) return;
+  currentUser.equippedFrame = frameCssClass || '';
+  saveCurrentUser();
+  renderUserProfile();
+  renderShop();
+  renderLeaderboard();
+  updateAvatarModalPreview();
+  renderAvatarFramesUnlocked();
+  playHapticSound('targetAchieved');
 }
 
 function resetAvatarToDefault() {
@@ -6944,6 +7023,72 @@ const SHOP_ITEMS = [
       bg: 'linear-gradient(135deg, #0284c7, #082f49)',
       glow: '0 0 16px rgba(14, 165, 233, 0.45)'
     }
+  },
+
+  // --- ЭКСКЛЮЗИВНЫЕ КАСТОМНЫЕ РАМКИ ДЛЯ АВАТАРКИ ---
+  {
+    id: 'frame_cyber',
+    category: 'frame',
+    name: '⚡ Кибер Неон (Cyber Neon)',
+    desc: 'Футуристическая неоновая рамка в стиле Cyberpunk с бирюзово-розовым сиянием',
+    price: 300,
+    cssClass: 'shop-frame-cyber'
+  },
+  {
+    id: 'frame_sakura',
+    category: 'frame',
+    name: '🌸 Цветение Сакуры (Sakura Bloom)',
+    desc: 'Нежная розовая рамка с мягким мерцанием весенних лепестков сакуры',
+    price: 260,
+    cssClass: 'shop-frame-sakura'
+  },
+  {
+    id: 'frame_matrix',
+    category: 'frame',
+    name: '🟢 Изумрудная Матрица (Emerald Matrix)',
+    desc: 'Кибернетическая матричная рамка с бегущим изумрудным свечением',
+    price: 280,
+    cssClass: 'shop-frame-matrix'
+  },
+  {
+    id: 'frame_amethyst',
+    category: 'frame',
+    name: '🔮 Космический Аметист (Nebula Amethyst)',
+    desc: 'Глубокое ультрафиолетовое свечение далеких галактик и космических туманностей',
+    price: 340,
+    cssClass: 'shop-frame-amethyst'
+  },
+  {
+    id: 'frame_inferno',
+    category: 'frame',
+    name: '🔥 Адское Пламя (Crimson Inferno)',
+    desc: 'Яростное вулканическое багрово-огненное пламя с пульсацией горящих углей',
+    price: 360,
+    cssClass: 'shop-frame-inferno'
+  },
+  {
+    id: 'frame_frost',
+    category: 'frame',
+    name: '❄️ Ледяной Клинок (Glacial Frost)',
+    desc: 'Криогенный ледяной кристалл с лазурным морозным сиянием абсолютного нуля',
+    price: 290,
+    cssClass: 'shop-frame-frost'
+  },
+  {
+    id: 'frame_dragon',
+    category: 'frame',
+    name: '🐉 Императорский Дракон (Imperial Gold)',
+    desc: 'Роскошная золотая рамка с переливом императорского золота и янтаря',
+    price: 420,
+    cssClass: 'shop-frame-dragon'
+  },
+  {
+    id: 'frame_synthwave',
+    category: 'frame',
+    name: '🌅 Ретровейв 80-х (Synthwave Sunset)',
+    desc: 'Атмосферный закатный неоновый градиент в стиле 80-х с пурпурно-оранжевым светом',
+    price: 310,
+    cssClass: 'shop-frame-synthwave'
   }
 ];
 
@@ -7398,6 +7543,59 @@ function renderShop() {
       avatarsGrid.appendChild(card);
     });
   }
+
+  // Render frames
+  const framesGrid = document.getElementById('shopFramesGrid');
+  if (framesGrid) {
+    framesGrid.innerHTML = '';
+    const frameItems = SHOP_ITEMS.filter(i => i.category === 'frame');
+    frameItems.forEach(item => {
+      const isOwned = inventory.includes(item.id);
+      const isEquipped = currentUser.equippedFrame === item.cssClass;
+      const framePreview = getAvatarHtml(currentUser, 50, item.cssClass);
+
+      let actionBtn = '';
+      if (!isOwned) {
+        const canAfford = coins >= item.price;
+        actionBtn = `
+          <button type="button" class="shop-buy-btn" ${canAfford ? '' : 'disabled'} onclick="buyShopItem('${item.id}')">
+            Купить за ${item.price} 🪙
+          </button>
+        `;
+      } else if (isEquipped) {
+        actionBtn = `
+          <button type="button" class="shop-unequip-btn" onclick="unequipShopItem('${item.id}')">
+            ✓ Надет (Снять)
+          </button>
+        `;
+      } else {
+        actionBtn = `
+          <button type="button" class="shop-equip-btn" onclick="equipShopItem('${item.id}')">
+            Надеть ✨
+          </button>
+        `;
+      }
+
+      const card = document.createElement('div');
+      card.className = `shop-item-card ${isEquipped ? 'equipped' : ''}`;
+      card.innerHTML = `
+        <div>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            ${framePreview}
+            <div>
+              <div class="shop-item-title">${item.name}</div>
+              <div class="shop-item-desc">${item.desc}</div>
+            </div>
+          </div>
+        </div>
+        <div class="shop-item-footer">
+          <span class="gold-coins-pill">🪙 ${item.price}</span>
+          ${actionBtn}
+        </div>
+      `;
+      framesGrid.appendChild(card);
+    });
+  }
 }
 
 function buyShopItem(itemId) {
@@ -7425,6 +7623,7 @@ function buyShopItem(itemId) {
   if (item.category === 'font') currentUser.equippedFont = item.cssClass;
   if (item.category === 'badge') currentUser.equippedBadge = item.id;
   if (item.category === 'avatar') currentUser.avatar = { type: 'shop', itemId: item.id };
+  if (item.category === 'frame') currentUser.equippedFrame = item.cssClass;
 
   saveCurrentUser();
   playHapticSound('targetAchieved');
@@ -7443,6 +7642,7 @@ function equipShopItem(itemId) {
   if (item.category === 'font') currentUser.equippedFont = item.cssClass;
   if (item.category === 'badge') currentUser.equippedBadge = item.id;
   if (item.category === 'avatar') currentUser.avatar = { type: 'shop', itemId: item.id };
+  if (item.category === 'frame') currentUser.equippedFrame = item.cssClass;
 
   saveCurrentUser();
   renderShop();
@@ -7461,6 +7661,8 @@ function unequipShopItem(itemId) {
     currentUser.equippedBadge = '';
   } else if (item.category === 'avatar' && currentUser.avatar && currentUser.avatar.itemId === item.id) {
     currentUser.avatar = null;
+  } else if (item.category === 'frame' && currentUser.equippedFrame === item.cssClass) {
+    currentUser.equippedFrame = '';
   }
 
   saveCurrentUser();
