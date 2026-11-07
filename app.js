@@ -112,6 +112,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initAchievements();
   initUserData();
   registerServiceWorker();
+
+  // Prevent any modal sheet from being horizontally shifted or trapped off-screen
+  document.querySelectorAll('.modal-sheet').forEach(sheet => {
+    sheet.addEventListener('scroll', () => {
+      if (sheet.scrollLeft !== 0) {
+        sheet.scrollLeft = 0;
+      }
+    }, { passive: true });
+  });
 });
 
 /* =========================================================
@@ -1399,7 +1408,11 @@ function openAddSlotModal() {
   document.getElementById('slotExercisesContainer').innerHTML = '';
   updateSlotExercisesHeaderVisibility();
   document.getElementById('deleteSlotBtn').classList.add('hidden');
-  document.getElementById('slotModal').classList.remove('hidden');
+  const slotModal = document.getElementById('slotModal');
+  slotModal.classList.remove('hidden');
+  slotModal.scrollLeft = 0;
+  const sheet = slotModal.querySelector('.modal-sheet');
+  if (sheet) { sheet.scrollLeft = 0; sheet.scrollTop = 0; }
 }
 
 function openEditSlotModal(slotId) {
@@ -1433,7 +1446,11 @@ function openEditSlotModal(slotId) {
   renderSlotExercisesInModal(slot.exercises || []);
 
   document.getElementById('deleteSlotBtn').classList.remove('hidden');
-  document.getElementById('slotModal').classList.remove('hidden');
+  const slotModal = document.getElementById('slotModal');
+  slotModal.classList.remove('hidden');
+  slotModal.scrollLeft = 0;
+  const sheet = slotModal.querySelector('.modal-sheet');
+  if (sheet) { sheet.scrollLeft = 0; sheet.scrollTop = 0; }
 }
 
 function closeSlotModal() {
@@ -1461,7 +1478,7 @@ function updateSlotExercisesHeaderVisibility() {
   const emptyHint = document.getElementById('slotExEmptyHint');
   const count = container ? container.querySelectorAll('.slot-ex-row').length : 0;
   if (header) {
-    header.style.display = count > 0 ? 'grid' : 'none';
+    header.style.display = 'none';
   }
   if (emptyHint) {
     emptyHint.style.display = count === 0 ? 'block' : 'none';
@@ -1471,7 +1488,7 @@ function updateSlotExercisesHeaderVisibility() {
 function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз') {
   const container = document.getElementById('slotExercisesContainer');
   const row = document.createElement('div');
-  row.className = 'slot-ex-row';
+  row.className = 'slot-ex-row slot-ex-card';
 
   const userExercises = (currentUser && currentUser.exercises) || DEFAULT_EXERCISES;
   const userStudy = (currentUser && currentUser.studyActivities) || DEFAULT_STUDY_ACTIVITIES;
@@ -1514,21 +1531,34 @@ function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз
   optionsHtml += `<option value="__custom__">✏️ Ввести другое вручную...</option>`;
 
   row.innerHTML = `
-    <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение или предмет из базы" aria-label="Упражнение">
-      ${optionsHtml}
-    </select>
-    <input type="number" placeholder="Подх." min="1" max="100" value="${sets}" title="Количество подходов" aria-label="Подходы" class="ex-sets-input">
-    <input type="number" placeholder="Норма" min="1" max="5000" value="${target}" title="Норма повторений, страниц или минут" aria-label="Норма или раз" class="ex-target-input">
-    <select class="ex-unit-input" title="Единица измерения" aria-label="Единица измерения">
-      <option value="раз" ${unit === 'раз' ? 'selected' : ''}>раз</option>
-      <option value="задач" ${unit === 'задач' ? 'selected' : ''}>задач</option>
-      <option value="стр" ${unit === 'стр' ? 'selected' : ''}>стр</option>
-      <option value="мин" ${unit === 'мин' ? 'selected' : ''}>мин</option>
-      <option value="сек" ${unit === 'сек' ? 'selected' : ''}>сек</option>
-      <option value="сессий" ${unit === 'сессий' ? 'selected' : ''}>сессий</option>
-      <option value="подх." ${unit === 'подх.' ? 'selected' : ''}>подх.</option>
-    </select>
-    <button type="button" class="slot-ex-delete-btn" onclick="removeSlotExerciseRow(this)" title="Удалить норму" aria-label="Удалить">✕</button>
+    <div class="slot-ex-card-top">
+      <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение или предмет из базы" aria-label="Упражнение">
+        ${optionsHtml}
+      </select>
+      <button type="button" class="slot-ex-delete-btn" onclick="removeSlotExerciseRow(this)" title="Удалить это упражнение" aria-label="Удалить">✕</button>
+    </div>
+    <div class="slot-ex-card-bottom">
+      <div class="slot-ex-metric-col">
+        <label class="slot-ex-metric-label">ПОДХОДЫ</label>
+        <input type="number" placeholder="4" min="1" max="100" value="${sets}" title="Количество подходов" aria-label="Подходы" class="ex-sets-input">
+      </div>
+      <div class="slot-ex-metric-col">
+        <label class="slot-ex-metric-label">РАЗ / НОРМА</label>
+        <input type="number" placeholder="25" min="1" max="5000" value="${target}" title="Целевое количество (норма повторений, страниц или минут)" aria-label="Норма" class="ex-target-input">
+      </div>
+      <div class="slot-ex-metric-col">
+        <label class="slot-ex-metric-label">ЕДИНИЦА</label>
+        <select class="ex-unit-input" title="Единица измерения" aria-label="Единица измерения">
+          <option value="раз" ${unit === 'раз' ? 'selected' : ''}>раз</option>
+          <option value="задач" ${unit === 'задач' ? 'selected' : ''}>задач</option>
+          <option value="стр" ${unit === 'стр' ? 'selected' : ''}>стр</option>
+          <option value="мин" ${unit === 'мин' ? 'selected' : ''}>мин</option>
+          <option value="сек" ${unit === 'сек' ? 'selected' : ''}>сек</option>
+          <option value="сессий" ${unit === 'сессий' ? 'selected' : ''}>сессий</option>
+          <option value="подх." ${unit === 'подх.' ? 'selected' : ''}>подх.</option>
+        </select>
+      </div>
+    </div>
   `;
   container.appendChild(row);
   updateSlotExercisesHeaderVisibility();
