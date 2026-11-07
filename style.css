@@ -713,161 +713,195 @@ body {
 
 /* Slot exercises inputs inside modal */
 .slot-exercises-section {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px 8px;
+  padding: 10px 10px;
   margin-top: 4px;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box !important;
-  overflow-x: hidden;
+  overflow-x: hidden !important;
 }
 
 .slot-ex-container {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
 .slot-ex-header-row {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1.05fr) 24px;
-  gap: 4px;
-  align-items: center;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 2px 5px 2px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.slot-ex-header-row span {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.slot-ex-header-row .ex-hdr-name {
-  text-align: left;
-  padding-left: 4px;
-  color: #a5b4fc;
-}
-
-.slot-ex-header-row .ex-hdr-sets {
-  color: #38bdf8;
-}
-
-.slot-ex-header-row .ex-hdr-target {
-  color: #34d399;
-}
-
-.slot-ex-header-row .ex-hdr-unit {
-  color: #f59e0b;
+  display: none !important;
 }
 
 .slot-ex-empty-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   text-align: center;
-  padding: 10px 6px;
+  padding: 12px 10px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-sm);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
   margin-bottom: 4px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-.slot-ex-row {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1.05fr) 24px;
-  gap: 4px;
+/* 2-tier Responsive Exercise Card inside Modal */
+.slot-ex-row.slot-ex-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.slot-ex-row.slot-ex-card:hover,
+.slot-ex-row.slot-ex-card:focus-within {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.slot-ex-card-top {
+  display: flex;
+  gap: 8px;
   align-items: center;
   width: 100%;
   box-sizing: border-box;
 }
 
-.slot-ex-row > * {
+.slot-ex-card-top .ex-name-select {
+  flex: 1;
   min-width: 0 !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-}
-
-.slot-ex-row input,
-.slot-ex-row select {
-  width: 100%;
-  min-width: 0 !important;
-  background: rgba(0, 0, 0, 0.5);
+  background: #0f172a;
   border: 1px solid var(--border);
   color: #f8fafc;
-  padding: 6px 3px !important;
-  border-radius: 6px;
-  font-size: 12px !important;
-  font-family: inherit;
+  padding: 9px 12px !important;
+  border-radius: 8px;
+  font-size: 14px !important;
   font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px;
+  cursor: pointer;
+}
+
+.slot-ex-card-top .ex-name-select:focus {
+  border-color: var(--primary);
+  outline: none;
+  background-color: rgba(15, 23, 42, 0.98);
+}
+
+.slot-ex-card-top .slot-ex-delete-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: var(--accent-red);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0 !important;
+}
+
+.slot-ex-card-top .slot-ex-delete-btn:active {
+  background: rgba(244, 63, 94, 0.3);
+  transform: scale(0.92);
+}
+
+.slot-ex-card-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.slot-ex-metric-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0 !important;
+  box-sizing: border-box;
+}
+
+.slot-ex-metric-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   text-align: center;
+}
+
+.slot-ex-metric-col:nth-child(1) .slot-ex-metric-label {
+  color: #38bdf8; /* Blue for Sets / Подходы */
+}
+
+.slot-ex-metric-col:nth-child(2) .slot-ex-metric-label {
+  color: #34d399; /* Green for Target / Раз / Норма */
+}
+
+.slot-ex-metric-col:nth-child(3) .slot-ex-metric-label {
+  color: #f59e0b; /* Amber for Unit / Единица */
+}
+
+.slot-ex-metric-col input,
+.slot-ex-metric-col select {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  background: #0f172a;
+  border: 1px solid var(--border);
+  color: #f8fafc;
+  padding: 8px 6px !important;
+  border-radius: 8px;
+  font-size: 15px !important;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
   -webkit-appearance: none;
   appearance: none;
 }
 
-.slot-ex-row input:focus,
-.slot-ex-row select:focus {
+.slot-ex-metric-col input:focus,
+.slot-ex-metric-col select:focus {
   border-color: var(--primary);
-  outline: none;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.95);
 }
 
-.slot-ex-row select.ex-name-select {
-  text-align: left;
-  padding-left: 6px !important;
-  padding-right: 12px !important;
-  font-size: 11px !important;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.slot-ex-metric-col select {
+  font-size: 13.5px !important;
+  font-weight: 600;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 3px center;
+  background-position: right 6px center;
   background-size: 8px;
-}
-
-.slot-ex-row select.ex-unit-input {
-  font-size: 11px !important;
-  padding-left: 2px !important;
-  padding-right: 10px !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 2px center;
-  background-size: 7px;
-}
-
-.slot-ex-delete-btn {
-  width: 24px;
-  height: 28px;
-  background: rgba(244, 63, 94, 0.12);
-  border: 1px solid rgba(244, 63, 94, 0.25);
-  color: var(--accent-red);
-  font-size: 13px;
+  padding-right: 18px !important;
   cursor: pointer;
-  padding: 0 !important;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.slot-ex-delete-btn:active {
-  transform: scale(0.92);
-  background: rgba(244, 63, 94, 0.3);
 }
 
 /* =========================================================
@@ -1889,6 +1923,7 @@ body {
   max-width: min(520px, 100vw);
   box-sizing: border-box !important;
   overflow-x: hidden !important;
+  overscroll-behavior-x: none;
   padding: 16px 14px calc(var(--safe-bottom) + 24px);
   display: flex;
   flex-direction: column;
@@ -1896,6 +1931,13 @@ body {
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   margin: 0 auto;
+}
+
+.modal-sheet form {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
 }
 
 @keyframes slideUp {
@@ -1919,8 +1961,25 @@ body {
 
 .input-row-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.input-row-2 > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.input-row-2 input,
+.input-row-2 select {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .modal-buttons {
@@ -2363,18 +2422,6 @@ body {
 .clear-penalties-btn:active {
   transform: scale(0.97);
   background: rgba(239, 68, 68, 0.3);
-}
-
-.slot-ex-row select.ex-name-select {
-  background: #151d2f;
-  border: 1px solid var(--border);
-  color: white;
-  padding: 7px 6px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  max-width: 100%;
-  outline: none;
 }
 
 .today-workout-report-item {
