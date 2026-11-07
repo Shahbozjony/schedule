@@ -85,6 +85,7 @@ const DEFAULT_BOOKS = [
     title: 'ACCA Study Text (Financial Reporting)',
     author: 'BPP / Kaplan',
     totalPages: 480,
+    basePage: 60,
     currentPage: 60,
     dailyTarget: 20,
     status: 'reading'
@@ -94,6 +95,7 @@ const DEFAULT_BOOKS = [
     title: 'Атомные привычки',
     author: 'Джеймс Клир',
     totalPages: 320,
+    basePage: 85,
     currentPage: 85,
     dailyTarget: 25,
     status: 'reading'
@@ -249,6 +251,7 @@ function ensureUserDefaults() {
   }
   currentUser.books.forEach(b => {
     if (b.currentPage === undefined) b.currentPage = 0;
+    if (b.basePage === undefined) b.basePage = b.currentPage;
     if (b.dailyTarget === undefined) b.dailyTarget = 25;
     if (!b.status) b.status = 'reading';
   });
@@ -286,6 +289,7 @@ function showMainScreen() {
     renderUserProfile();
     renderSchedule();
     renderPushups();
+    renderStudy();
     renderPenalties();
     renderReport();
   } catch (err) {
@@ -682,6 +686,17 @@ function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз
   let optionsHtml = `<option value="">-- Выберите из базы --</option>`;
   let matched = false;
 
+  const userBooks = (currentUser && currentUser.books) || DEFAULT_BOOKS;
+  if (userBooks.length > 0) {
+    optionsHtml += `<optgroup label="📖 Мои книги">`;
+    userBooks.forEach(b => {
+      const isSelected = b.title === name;
+      if (isSelected) matched = true;
+      optionsHtml += `<option value="${escapeHtml(b.title)}" data-kind="book" ${isSelected ? 'selected' : ''}>📖 ${escapeHtml(b.title)}</option>`;
+    });
+    optionsHtml += `</optgroup>`;
+  }
+
   optionsHtml += `<optgroup label="📚 Учёба и чтение">`;
   userStudy.forEach(st => {
     const isSelected = st.name === name;
@@ -789,6 +804,20 @@ function onSlotExerciseSelectChanged(selectEl) {
       selectEl.value = '';
     }
     return;
+  }
+
+  // Check in books first
+  if (currentUser && currentUser.books) {
+    const matchedBook = currentUser.books.find(b => b.title === val);
+    if (matchedBook) {
+      const setsInput = row.querySelector('.ex-sets-input');
+      const targetInput = row.querySelector('.ex-target-input');
+      const unitSelect = row.querySelector('.ex-unit-input');
+      if (setsInput) setsInput.value = 1;
+      if (targetInput) targetInput.value = matchedBook.dailyTarget || 20;
+      if (unitSelect) unitSelect.value = 'стр';
+      return;
+    }
   }
 
   // Check in study activities first
@@ -2549,14 +2578,32 @@ function renderBooks() {
 
   books.forEach(book => {
     const totalPages = Math.max(1, parseInt(book.totalPages, 10) || 100);
-    const currentPage = Math.min(totalPages, Math.max(0, parseInt(book.currentPage, 10) || 0));
     const dailyTarget = Math.max(1, parseInt(book.dailyTarget, 10) || 20);
-    const percent = Math.min(100, Math.round((currentPage / totalPages) * 100));
-    const remainingPages = Math.max(0, totalPages - currentPage);
-    const daysLeft = Math.ceil(remainingPages / dailyTarget);
-    const isCompleted = currentPage >= totalPages;
 
-    const todayReadForBook = todayLog.bookPages[book.id] || 0;
+    // Base page before today's reading
+    const basePage = (book.basePage !== undefined) ? parseInt(book.basePage, 10) : (parseInt(book.currentPage, 10) || 0);
+
+    // Pages read today according to schedule
+    let todayReadForBook = (todayLog.bookPages && todayLog.bookPages[book.id]) || 0;
+    if (todayReadForBook === 0 && todayLog.scheduleDone) {
+      const bTitleLower = (book.title || '').toLowerCase();
+      for (const [exName, factVal] of Object.entries(todayLog.scheduleDone)) {
+        const exLower = exName.toLowerCase();
+        if (exLower === bTitleLower || 
+            (bTitleLower.length > 5 && exLower.includes(bTitleLower)) || 
+            (exLower.length > 5 && bTitleLower.includes(exLower)) ||
+            ((exLower.includes('чтени') || exLower.includes('книг')) && books.length === 1)) {
+          todayReadForBook = parseInt(factVal, 10) || 0;
+          break;
+        }
+      }
+    }
+
+    const effectiveCurrentPage = Math.min(totalPages, Math.max(0, basePage + todayReadForBook));
+    const percent = Math.min(100, Math.round((effectiveCurrentPage / totalPages) * 100));
+    const remainingPages = Math.max(0, totalPages - effectiveCurrentPage);
+    const daysLeft = dailyTarget > 0 ? Math.ceil(remainingPages / dailyTarget) : 0;
+    const isCompleted = effectiveCurrentPage >= totalPages;
 
     const card = document.createElement('div');
     card.className = `book-card ${isCompleted ? 'completed' : ''}`;
@@ -2577,10 +2624,11 @@ function renderBooks() {
         </div>
       </div>
 
-      <div class="book-progress-box">
+      <div class="book-progress-box" style="margin-bottom: 0;">
         <div class="book-progress-header">
           <span class="book-pages-counter">
-            Страница <b>${currentPage}</b> из <b>${totalPages}</b>
+            Страница <b>${effectiveCurrentPage}</b> из <b>${totalPages}</b>
+            ${todayReadForBook > 0 ? `<span style="color: var(--accent-green); font-size: 11px; margin-left: 6px; font-weight: 700;">(+${todayReadForBook} сегодня по расписанию)</span>` : ''}
           </span>
           <span class="book-pct-badge">${percent}%</span>
         </div>
@@ -2590,23 +2638,6 @@ function renderBooks() {
         <div class="book-sub-stats">
           <span>Цель: <b>${dailyTarget} стр./день</b></span>
           <span>${isCompleted ? '🎉 Все страницы прочитаны!' : `Осталось: <b>${remainingPages} стр.</b> (~${daysLeft} дн.)`}</span>
-        </div>
-      </div>
-
-      <div class="book-logging-row">
-        <div class="book-log-label">Прочитано сегодня:</div>
-        <div class="sched-comp-fact-wrap">
-          <button type="button" class="sched-set-step-btn" title="Уменьшить" onclick="stepBookTodayPages('${book.id}', -5)">−</button>
-          <input type="number" 
-                 class="sched-set-input" 
-                 style="width: 55px;" 
-                 value="${todayReadForBook}" 
-                 min="0" 
-                 onfocus="this.select()"
-                 onchange="setBookTodayPages('${book.id}', this.value)">
-          <button type="button" class="sched-set-step-btn" title="Увеличить" onclick="stepBookTodayPages('${book.id}', 5)">+</button>
-          <button type="button" class="sched-set-target-btn" title="Выполнить дневную норму (${dailyTarget} стр.)" onclick="setBookTodayPages('${book.id}', ${dailyTarget})">=${dailyTarget}</button>
-          <span style="font-size: 12px; font-weight: 700; color: var(--text-dim); margin-left: 2px;">стр.</span>
         </div>
       </div>
     `;
@@ -2632,7 +2663,7 @@ function openEditBookModal(bookId) {
   document.getElementById('bookAuthorInput').value = book.author || '';
   document.getElementById('bookTotalPagesInput').value = book.totalPages;
   document.getElementById('bookDailyTargetInput').value = book.dailyTarget;
-  document.getElementById('bookCurrentPageInput').value = book.currentPage;
+  document.getElementById('bookCurrentPageInput').value = (book.basePage !== undefined) ? book.basePage : (book.currentPage || 0);
   document.getElementById('bookModal').classList.remove('hidden');
 }
 
@@ -2647,7 +2678,7 @@ function saveBookForm(e) {
   const author = document.getElementById('bookAuthorInput').value.trim();
   const totalPages = parseInt(document.getElementById('bookTotalPagesInput').value, 10) || 100;
   const dailyTarget = parseInt(document.getElementById('bookDailyTargetInput').value, 10) || 25;
-  const currentPage = Math.min(totalPages, Math.max(0, parseInt(document.getElementById('bookCurrentPageInput').value, 10) || 0));
+  const inputPage = Math.min(totalPages, Math.max(0, parseInt(document.getElementById('bookCurrentPageInput').value, 10) || 0));
 
   if (!title) return;
 
@@ -2660,8 +2691,9 @@ function saveBookForm(e) {
       existing.author = author;
       existing.totalPages = totalPages;
       existing.dailyTarget = dailyTarget;
-      existing.currentPage = currentPage;
-      existing.status = (currentPage >= totalPages) ? 'completed' : 'reading';
+      existing.basePage = inputPage;
+      existing.currentPage = inputPage;
+      existing.status = (inputPage >= totalPages) ? 'completed' : 'reading';
     }
   } else {
     const newBook = {
@@ -2670,8 +2702,9 @@ function saveBookForm(e) {
       author,
       totalPages,
       dailyTarget,
-      currentPage,
-      status: (currentPage >= totalPages) ? 'completed' : 'reading',
+      basePage: inputPage,
+      currentPage: inputPage,
+      status: (inputPage >= totalPages) ? 'completed' : 'reading',
       startedDate: getTodayDateKey()
     };
     currentUser.books.push(newBook);
@@ -2993,7 +3026,17 @@ function renderStudyHistory() {
 
 function getScheduleStudyExercises() {
   if (!currentUser || !currentUser.scheduleSlots) return [];
-  const studySlots = currentUser.scheduleSlots.filter(s => s.category === 'work');
+  const studySlots = currentUser.scheduleSlots.filter(s => {
+    if (s.category === 'work') return true;
+    const cat = (currentUser.customCategories || []).find(c => c.id === s.category);
+    if (cat && (cat.name.toLowerCase().includes('учеб') || cat.name.toLowerCase().includes('книг') || cat.name.toLowerCase().includes('чтен') || cat.name.toLowerCase().includes('acca'))) return true;
+    const hasStudyEx = (s.exercises || []).some(ex => {
+      const exLower = (ex.name || '').toLowerCase();
+      return (currentUser.studyActivities || []).some(sa => sa.name.toLowerCase() === exLower) ||
+             (currentUser.books || []).some(b => b.title.toLowerCase() === exLower || exLower.includes(b.title.toLowerCase()));
+    });
+    return hasStudyEx;
+  });
   const result = [];
   studySlots.forEach(slot => {
     const exs = slot.exercises || [];
@@ -3001,7 +3044,7 @@ function getScheduleStudyExercises() {
       const sets = parseInt(ex.sets, 10) || 1;
       const target = parseInt(ex.target, 10) || 10;
       const unit = ex.unit || 'задач';
-      const isCountUnit = unit === 'задач' || unit === 'стр' || unit === 'мин' || unit === 'раз' || unit === 'сек' || unit === 'глав';
+      const isCountUnit = unit === 'задач' || unit === 'стр' || unit === 'мин' || unit === 'раз' || unit === 'сек' || unit === 'сессий' || unit === 'глав';
       const totalPlan = isCountUnit ? (sets * target) : sets;
 
       result.push({
@@ -3254,6 +3297,7 @@ function handleScheduleStudySetInput(inputEl, exName, setIndex, totalPlan, unit,
 
   syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
   saveCurrentUser();
+  renderBooks();
 }
 
 function setScheduleStudySetVal(exName, setIndex, val) {
@@ -3277,6 +3321,7 @@ function setScheduleStudySetVal(exName, setIndex, val) {
 
   syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
   saveCurrentUser();
+  renderBooks();
   renderScheduleStudyComparison();
   renderStudy();
   renderTodayStudyReport();
@@ -3313,6 +3358,7 @@ function fillScheduleStudySetsWithTarget(exName, targetVal) {
   todayLog.scheduleDone[exName] = totalFact;
   syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
   saveCurrentUser();
+  renderBooks();
   renderScheduleStudyComparison();
   renderStudy();
   renderTodayStudyReport();
@@ -3327,6 +3373,7 @@ function addScheduleExtraStudySet(exName) {
   if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
   todayLog.scheduleSets[exName].push(0);
   saveCurrentUser();
+  renderBooks();
   renderScheduleStudyComparison();
   renderTodayStudyReport();
 }
@@ -3342,6 +3389,7 @@ function removeScheduleStudySet(exName, setIndex) {
   todayLog.scheduleDone[exName] = totalFact;
   syncScheduleStudyWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
   saveCurrentUser();
+  renderBooks();
   renderScheduleStudyComparison();
   renderStudy();
   renderTodayStudyReport();
@@ -3352,6 +3400,7 @@ function syncScheduleStudyWithCatalog(exName, totalFact, setsArray) {
   const todayKey = getTodayDateKey();
   initUserStudyActivities();
   const todayLog = currentUser.studyLogs[todayKey];
+  if (!todayLog.bookPages) todayLog.bookPages = {};
 
   const matchedAct = (currentUser.studyActivities || []).find(a => a.name.toLowerCase() === exName.toLowerCase());
   if (matchedAct) {
@@ -3370,6 +3419,23 @@ function syncScheduleStudyWithCatalog(exName, totalFact, setsArray) {
       actData.done = totalFact;
       actData.completed = (totalFact >= (matchedAct.target || 1));
     }
+  }
+
+  // Sync with matching book in currentUser.books
+  const exLower = (exName || '').toLowerCase();
+  const matchedBook = (currentUser.books || []).find(b => {
+    const bTitle = (b.title || '').toLowerCase();
+    return bTitle === exLower || 
+           (bTitle.length > 5 && exLower.includes(bTitle)) || 
+           (exLower.length > 5 && bTitle.includes(exLower)) ||
+           ((exLower.includes('чтени') || exLower.includes('книг')) && currentUser.books.length === 1);
+  });
+
+  if (matchedBook) {
+    todayLog.bookPages[matchedBook.id] = totalFact;
+    const base = (matchedBook.basePage !== undefined) ? matchedBook.basePage : (matchedBook.currentPage || 0);
+    matchedBook.currentPage = Math.min(matchedBook.totalPages, Math.max(0, base + totalFact));
+    matchedBook.status = (matchedBook.currentPage >= matchedBook.totalPages) ? 'completed' : 'reading';
   }
 }
 
