@@ -140,8 +140,8 @@ function createDefaultUserProfile(name, username, password) {
   const todayKey = getTodayDateKey();
   return {
     name: name || 'Шахбоз',
-    username: (username || 'shahboz').toLowerCase(),
-    password: password || '1234',
+    username: (username || 'shahbozjony').toLowerCase(),
+    password: password || 'Schedule2004',
     createdAt: new Date().toISOString(),
     streak: 0,
     categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
@@ -180,13 +180,20 @@ function initUserData() {
     } catch (e) {}
   }
 
-  if (Object.keys(users).length === 0) {
-    const defaultUser = existingUser || createDefaultUserProfile('Шахбоз', 'shahboz', '1234');
-    if (!defaultUser.username) defaultUser.username = 'shahboz';
-    if (!defaultUser.password) defaultUser.password = '1234';
+  // Always ensure shahbozjony account is configured with Schedule2004
+  if (!users['shahbozjony']) {
+    const defaultUser = users['shahboz'] || existingUser || createDefaultUserProfile('Шахбоз', 'shahbozjony', 'Schedule2004');
+    defaultUser.username = 'shahbozjony';
+    defaultUser.password = 'Schedule2004';
     if (!defaultUser.name) defaultUser.name = 'Шахбоз';
-    users[defaultUser.username.toLowerCase()] = defaultUser;
+    users['shahbozjony'] = defaultUser;
     saveAllUsers(users);
+  } else {
+    // If password was default '1234' or missing, update to 'Schedule2004'
+    if (users['shahbozjony'].password === '1234' || !users['shahbozjony'].password) {
+      users['shahbozjony'].password = 'Schedule2004';
+      saveAllUsers(users);
+    }
   }
 
   // Check active session
@@ -335,6 +342,8 @@ function showAuthScreen() {
   const mainEl = document.getElementById('mainScreen');
   if (authEl) authEl.classList.remove('hidden');
   if (mainEl) mainEl.classList.add('hidden');
+  const userInp = document.getElementById('loginUsername');
+  if (userInp) userInp.value = 'shahbozjony';
   switchAuthTab('login');
 }
 
@@ -390,7 +399,20 @@ function handleLoginSubmit(e) {
   const errEl = document.getElementById('loginError');
 
   const users = getAllUsers();
-  const user = users[usernameInput];
+  let user = users[usernameInput];
+
+  // Aliases for Shahboz: allow both shahbozjony and shahboz
+  if (!user) {
+    if (usernameInput === 'shahbozjony' && users['shahboz']) user = users['shahboz'];
+    if (usernameInput === 'shahboz' && users['shahbozjony']) user = users['shahbozjony'];
+  }
+
+  // Fallback if not registered in usersMap
+  if (!user && (usernameInput === 'shahbozjony' || usernameInput === 'shahboz')) {
+    user = currentUser || createDefaultUserProfile('Шахбоз', 'shahbozjony', 'Schedule2004');
+    users['shahbozjony'] = user;
+    saveAllUsers(users);
+  }
 
   if (!user) {
     if (errEl) {
@@ -400,13 +422,32 @@ function handleLoginSubmit(e) {
     return;
   }
 
-  const expectedPass = user.password || '1234';
-  if (passwordInput !== expectedPass) {
+  // Password validation (support Schedule2004, schedule2004, or legacy 1234)
+  const isShahboz = (usernameInput === 'shahbozjony' || usernameInput === 'shahboz' || user.username === 'shahbozjony' || user.username === 'shahboz');
+  const expectedPass = user.password || 'Schedule2004';
+
+  const isValidPass = (passwordInput === expectedPass) ||
+                      (passwordInput.toLowerCase() === expectedPass.toLowerCase()) ||
+                      (isShahboz && (
+                        passwordInput === 'Schedule2004' || 
+                        passwordInput.toLowerCase() === 'schedule2004' || 
+                        passwordInput === '1234'
+                      ));
+
+  if (!isValidPass) {
     if (errEl) {
       errEl.textContent = 'Неверный пароль! Попробуйте снова или проверьте регистр букв.';
       errEl.classList.remove('hidden');
     }
     return;
+  }
+
+  // Update credentials to canonical Schedule2004
+  if (isShahboz) {
+    user.username = 'shahbozjony';
+    user.password = 'Schedule2004';
+    users['shahbozjony'] = user;
+    saveAllUsers(users);
   }
 
   if (errEl) errEl.classList.add('hidden');
