@@ -1723,9 +1723,10 @@ function renderScheduleWorkoutComparison() {
 
   const sportExercises = getScheduleSportExercises();
   const todayKey = getTodayDateKey();
-  if (!currentUser.workoutLogs[todayKey]) currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {} };
+  if (!currentUser.workoutLogs[todayKey]) currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {}, scheduleSets: {} };
   const todayLog = currentUser.workoutLogs[todayKey];
   if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
 
   if (sportExercises.length === 0) {
     container.innerHTML = `
@@ -1740,24 +1741,46 @@ function renderScheduleWorkoutComparison() {
     return;
   }
 
-  sportExercises.forEach(item => {
+  sportExercises.forEach((item, exIdx) => {
     const key = item.name;
-    let factDone = todayLog.scheduleDone[key];
-    if (factDone === undefined) {
-      const matchedEx = (currentUser.exercises || []).find(e => e.name.toLowerCase() === item.name.toLowerCase());
-      if (matchedEx && todayLog.exercises && todayLog.exercises[matchedEx.id]) {
-        const exData = todayLog.exercises[matchedEx.id];
-        factDone = matchedEx.type === 'sets' ? ((exData.sets && exData.sets.length) || 0) : (exData.done || 0);
+    const cardId = 'sc_' + exIdx + '_' + (item.slotId || 'slot');
+
+    let setsArr = todayLog.scheduleSets[key];
+    if (!Array.isArray(setsArr)) {
+      const count = Math.max(1, item.sets || 1);
+      setsArr = [];
+      const prevDone = todayLog.scheduleDone[key];
+      if (prevDone !== undefined && prevDone > 0) {
+        if (prevDone === item.totalPlan && item.sets > 0) {
+          for (let i = 0; i < count; i++) setsArr.push(item.target);
+        } else {
+          let rem = prevDone;
+          for (let i = 0; i < count; i++) {
+            const val = Math.min(item.target, rem);
+            setsArr.push(val);
+            rem -= val;
+          }
+          if (rem > 0 && setsArr.length > 0) setsArr[setsArr.length - 1] += rem;
+        }
       } else {
-        factDone = 0;
+        for (let i = 0; i < count; i++) setsArr.push(0);
       }
-      todayLog.scheduleDone[key] = factDone;
+      todayLog.scheduleSets[key] = setsArr;
     }
 
+    // Ensure setsArr has at least item.sets entries
+    while (setsArr.length < item.sets) {
+      setsArr.push(0);
+    }
+
+    // Sum of all sets
+    const totalFact = setsArr.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+    todayLog.scheduleDone[key] = totalFact;
+
     const totalPlan = item.totalPlan;
-    const diff = factDone - totalPlan;
-    const isCompleted = factDone >= totalPlan;
-    const pct = totalPlan > 0 ? Math.round((factDone / totalPlan) * 100) : 0;
+    const diff = totalFact - totalPlan;
+    const isCompleted = totalFact >= totalPlan;
+    const pct = totalPlan > 0 ? Math.round((totalFact / totalPlan) * 100) : 0;
 
     let diffBadgeHtml = '';
     if (diff < 0) {
@@ -1769,10 +1792,43 @@ function renderScheduleWorkoutComparison() {
       diffBadgeHtml = `<span class="diff-badge diff-over">Перевыполнено: +${diff} ${item.unit} (${pct}%) 🔥</span>`;
     }
 
-    const stepAmount = (item.unit === 'подх.') ? 1 : (item.unit === 'сек' ? 10 : 10);
+    const stepDelta = (item.unit === 'сек' ? 5 : 1);
+    const setsRowsHtml = setsArr.map((val, sIdx) => {
+      const setNumber = sIdx + 1;
+      const isTargetHit = (val === item.target && val > 0);
+      const isOverHit = (val > item.target);
+      const canDelete = setsArr.length > item.sets;
+
+      return `
+        <div class="sched-set-row ${isTargetHit ? 'set-hit' : (isOverHit ? 'set-over' : '')}">
+          <div class="sched-set-label-wrap">
+            <span class="sched-set-badge">${setNumber}-й подход</span>
+            ${isTargetHit ? '<span class="sched-set-status-hit" title="Норма выполнена!">✓</span>' : (isOverHit ? '<span class="sched-set-status-over" title="Перевыполнено!">🔥</span>' : '')}
+          </div>
+
+          <div class="sched-set-controls">
+            <button type="button" class="sched-set-step-btn" title="Уменьшить" onclick="stepScheduleSetVal('${escapeHtml(item.name)}', ${sIdx}, -${stepDelta})">−</button>
+            <input type="number" 
+                   class="sched-set-input" 
+                   value="${val}" 
+                   min="0" 
+                   onfocus="this.select()"
+                   oninput="handleScheduleSetInput(this, '${escapeHtml(item.name)}', ${sIdx}, ${totalPlan}, '${item.unit}', '${cardId}')"
+                   onchange="setScheduleSetVal('${escapeHtml(item.name)}', ${sIdx}, this.value)">
+            <button type="button" class="sched-set-step-btn" title="Увеличить" onclick="stepScheduleSetVal('${escapeHtml(item.name)}', ${sIdx}, ${stepDelta})">+</button>
+            <button type="button" class="sched-set-target-btn" title="Поставить план ${item.target} ${item.unit}" onclick="setScheduleSetVal('${escapeHtml(item.name)}', ${sIdx}, ${item.target})">=${item.target}</button>
+            <span class="sched-set-unit">${item.unit}</span>
+            ${canDelete ? `
+              <button type="button" class="sched-set-del-btn" title="Удалить подход" onclick="removeScheduleSet('${escapeHtml(item.name)}', ${sIdx})">✕</button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
 
     const card = document.createElement('div');
     card.className = `schedule-comparison-item ${isCompleted ? 'completed' : ''}`;
+    card.id = `sched-card-${cardId}`;
     card.innerHTML = `
       <div class="sched-comp-top">
         <div>
@@ -1782,7 +1838,9 @@ function renderScheduleWorkoutComparison() {
           </div>
           <div class="sched-comp-slot-tag">Блок расписания: ${escapeHtml(item.slotName)} (${item.slotTime})</div>
         </div>
-        ${diffBadgeHtml}
+        <div id="sched-badge-${cardId}">
+          ${diffBadgeHtml}
+        </div>
       </div>
 
       <div class="sched-comp-grid">
@@ -1792,60 +1850,244 @@ function renderScheduleWorkoutComparison() {
         </div>
 
         <div class="sched-comp-col">
-          <span class="sched-comp-col-label">Факт (сделано)</span>
-          <div class="sched-comp-fact-wrap">
-            <button type="button" class="sched-fact-btn" onclick="stepScheduleExerciseDone('${escapeHtml(item.name)}', -${stepAmount})">−</button>
-            <input type="number" class="sched-fact-input" value="${factDone}" min="0" onchange="setScheduleExerciseDone('${escapeHtml(item.name)}', this.value)">
-            <button type="button" class="sched-fact-btn" onclick="stepScheduleExerciseDone('${escapeHtml(item.name)}', ${stepAmount})">+</button>
-            <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-left: 2px;">${item.unit}</span>
+          <span class="sched-comp-col-label">Факт (сумма подходов)</span>
+          <div class="sched-comp-fact-total" id="sched-fact-${cardId}">
+            <b>${totalFact}</b> ${item.unit}
           </div>
         </div>
 
         <div class="sched-comp-col">
-          <span class="sched-comp-col-label">Разница (Факт - План)</span>
-          <div style="font-size: 13px; font-weight: 800; color: ${diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)'}">
+          <span class="sched-comp-col-label">Разница (Факт − План)</span>
+          <div id="sched-diff-${cardId}" style="font-size: 14px; font-weight: 800; color: ${diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)'}">
             ${diff > 0 ? `+${diff}` : diff} ${item.unit}
           </div>
         </div>
       </div>
 
       <div class="today-rep-bar-bg" style="margin-top: 8px;">
-        <div class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background-color: ${isCompleted ? 'var(--accent-green)' : (factDone > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
+        <div id="sched-bar-${cardId}" class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background-color: ${isCompleted ? 'var(--accent-green)' : (totalFact > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
+      </div>
+
+      <div class="sched-sets-breakdown-box">
+        <div class="sched-sets-header">
+          <div class="sched-sets-header-title">
+            <span>🔢 По подходам (план: ${item.sets} по ${item.target} ${item.unit}):</span>
+          </div>
+          <div class="sched-sets-header-actions">
+            <button type="button" class="sched-quick-action-btn" title="Заполнить все подходы плановым количеством" onclick="fillScheduleSetsWithTarget('${escapeHtml(item.name)}', ${item.target})">
+              ⚡ Все по ${item.target}
+            </button>
+            <button type="button" class="sched-quick-action-btn add-btn" title="Добавить еще один подход" onclick="addScheduleExtraSet('${escapeHtml(item.name)}')">
+              + Подход
+            </button>
+          </div>
+        </div>
+
+        <div class="sched-sets-grid">
+          ${setsRowsHtml}
+        </div>
       </div>
     `;
     container.appendChild(card);
   });
 }
 
+function handleScheduleSetInput(inputEl, exName, setIndex, totalPlan, unit, cardId) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.workoutLogs[todayKey]) {
+    currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {}, scheduleSets: {} };
+  }
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  while (todayLog.scheduleSets[exName].length <= setIndex) todayLog.scheduleSets[exName].push(0);
+
+  const num = Math.max(0, parseInt(inputEl.value, 10) || 0);
+  todayLog.scheduleSets[exName][setIndex] = num;
+
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+
+  // Live update card DOM without stealing focus
+  const factEl = document.getElementById(`sched-fact-${cardId}`);
+  if (factEl) factEl.innerHTML = `<b>${totalFact}</b> ${unit}`;
+
+  const diff = totalFact - totalPlan;
+  const diffEl = document.getElementById(`sched-diff-${cardId}`);
+  if (diffEl) {
+    diffEl.textContent = `${diff > 0 ? '+' + diff : diff} ${unit}`;
+    diffEl.style.color = diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)';
+  }
+
+  const pct = totalPlan > 0 ? Math.round((totalFact / totalPlan) * 100) : 0;
+  const isCompleted = totalFact >= totalPlan;
+
+  const badgeEl = document.getElementById(`sched-badge-${cardId}`);
+  if (badgeEl) {
+    if (diff < 0) {
+      badgeEl.innerHTML = `<span class="diff-badge diff-remaining">Осталось: ${Math.abs(diff)} ${unit} (${pct}%) ⏳</span>`;
+    } else if (diff === 0) {
+      badgeEl.innerHTML = `<span class="diff-badge diff-exact">✓ Выполнено в точности (100%) 🎯</span>`;
+    } else {
+      badgeEl.innerHTML = `<span class="diff-badge diff-over">Перевыполнено: +${diff} ${unit} (${pct}%) 🔥</span>`;
+    }
+  }
+
+  const barEl = document.getElementById(`sched-bar-${cardId}`);
+  if (barEl) {
+    barEl.style.width = `${Math.min(100, pct)}%`;
+    barEl.style.backgroundColor = isCompleted ? 'var(--accent-green)' : (totalFact > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)');
+  }
+
+  const cardEl = document.getElementById(`sched-card-${cardId}`);
+  if (cardEl) {
+    if (isCompleted) cardEl.classList.add('completed');
+    else cardEl.classList.remove('completed');
+  }
+
+  syncScheduleExerciseWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+}
+
+function setScheduleSetVal(exName, setIndex, val) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.workoutLogs[todayKey]) {
+    currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {}, scheduleSets: {} };
+  }
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  while (todayLog.scheduleSets[exName].length <= setIndex) todayLog.scheduleSets[exName].push(0);
+
+  const num = Math.max(0, parseInt(val, 10) || 0);
+  todayLog.scheduleSets[exName][setIndex] = num;
+
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+
+  syncScheduleExerciseWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+  renderScheduleWorkoutComparison();
+  renderTodayWorkoutReport();
+  renderPushups();
+}
+
+function stepScheduleSetVal(exName, setIndex, delta) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.workoutLogs[todayKey]) {
+    currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {}, scheduleSets: {} };
+  }
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  while (todayLog.scheduleSets[exName].length <= setIndex) todayLog.scheduleSets[exName].push(0);
+
+  const cur = parseInt(todayLog.scheduleSets[exName][setIndex], 10) || 0;
+  const next = Math.max(0, cur + delta);
+  setScheduleSetVal(exName, setIndex, next);
+}
+
+function fillScheduleSetsWithTarget(exName, targetVal) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  for (let i = 0; i < todayLog.scheduleSets[exName].length; i++) {
+    todayLog.scheduleSets[exName][i] = targetVal;
+  }
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+  syncScheduleExerciseWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+  renderScheduleWorkoutComparison();
+  renderTodayWorkoutReport();
+  renderPushups();
+}
+
+function addScheduleExtraSet(exName) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  if (!Array.isArray(todayLog.scheduleSets[exName])) todayLog.scheduleSets[exName] = [];
+  todayLog.scheduleSets[exName].push(0);
+  saveCurrentUser();
+  renderScheduleWorkoutComparison();
+  renderTodayWorkoutReport();
+}
+
+function removeScheduleSet(exName, setIndex) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleSets || !Array.isArray(todayLog.scheduleSets[exName])) return;
+  todayLog.scheduleSets[exName].splice(setIndex, 1);
+  const totalFact = todayLog.scheduleSets[exName].reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  todayLog.scheduleDone[exName] = totalFact;
+  syncScheduleExerciseWithCatalog(exName, totalFact, todayLog.scheduleSets[exName]);
+  saveCurrentUser();
+  renderScheduleWorkoutComparison();
+  renderTodayWorkoutReport();
+  renderPushups();
+}
+
+function syncScheduleExerciseWithCatalog(exName, totalFact, setsArray) {
+  if (!currentUser) return;
+  const todayKey = getTodayDateKey();
+  if (!currentUser.workoutLogs[todayKey]) return;
+  const todayLog = currentUser.workoutLogs[todayKey];
+
+  const matchedEx = (currentUser.exercises || []).find(e => e.name.toLowerCase() === exName.toLowerCase());
+  if (matchedEx) {
+    if (!todayLog.exercises[matchedEx.id]) {
+      todayLog.exercises[matchedEx.id] = (matchedEx.type === 'sets' ? { sets: [], completed: false } : { done: 0, completed: false });
+    }
+    const exData = todayLog.exercises[matchedEx.id];
+    if (matchedEx.type === 'sets') {
+      const existingSets = exData.sets || [];
+      exData.sets = (setsArray || []).map((reps, i) => ({
+        weight: (existingSets[i] && existingSets[i].weight !== undefined) ? existingSets[i].weight : 0,
+        reps: reps
+      }));
+      exData.completed = (totalFact >= (matchedEx.target || 1));
+    } else {
+      exData.done = totalFact;
+      exData.completed = (totalFact >= (matchedEx.target || 1));
+    }
+  }
+}
+
 function setScheduleExerciseDone(exName, val) {
   if (!currentUser) return;
   const num = Math.max(0, parseInt(val, 10) || 0);
   const todayKey = getTodayDateKey();
-  if (!currentUser.workoutLogs[todayKey]) currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {} };
-  if (!currentUser.workoutLogs[todayKey].scheduleDone) currentUser.workoutLogs[todayKey].scheduleDone = {};
-  currentUser.workoutLogs[todayKey].scheduleDone[exName] = num;
+  if (!currentUser.workoutLogs[todayKey]) currentUser.workoutLogs[todayKey] = { exercises: {}, scheduleDone: {}, scheduleSets: {} };
+  const todayLog = currentUser.workoutLogs[todayKey];
+  if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
+  if (!todayLog.scheduleSets) todayLog.scheduleSets = {};
+  todayLog.scheduleDone[exName] = num;
 
-  // Sync with matching exercise in currentUser.exercises
-  const matchedEx = (currentUser.exercises || []).find(e => e.name.toLowerCase() === exName.toLowerCase());
-  if (matchedEx) {
-    if (!currentUser.workoutLogs[todayKey].exercises[matchedEx.id]) {
-      currentUser.workoutLogs[todayKey].exercises[matchedEx.id] = (matchedEx.type === 'sets' ? { sets: [], completed: false } : { done: 0, completed: false });
-    }
-    const exData = currentUser.workoutLogs[todayKey].exercises[matchedEx.id];
-    if (matchedEx.type === 'sets') {
-      if (!exData.sets) exData.sets = [];
-      while (exData.sets.length < num) exData.sets.push({ weight: 60, reps: 10 });
-      if (exData.sets.length > num) exData.sets = exData.sets.slice(0, num);
-      if (num >= matchedEx.target) exData.completed = true;
-    } else {
-      exData.done = num;
-      if (num >= matchedEx.target) exData.completed = true;
+  if (Array.isArray(todayLog.scheduleSets[exName]) && todayLog.scheduleSets[exName].length > 0) {
+    const len = todayLog.scheduleSets[exName].length;
+    const base = Math.floor(num / len);
+    let rem = num % len;
+    for (let i = 0; i < len; i++) {
+      todayLog.scheduleSets[exName][i] = base + (rem > 0 ? 1 : 0);
+      if (rem > 0) rem--;
     }
   }
 
+  syncScheduleExerciseWithCatalog(exName, num, todayLog.scheduleSets[exName]);
   saveCurrentUser();
   renderPushups();
   renderReport();
+  renderScheduleWorkoutComparison();
 }
 
 function stepScheduleExerciseDone(exName, delta) {
@@ -1862,7 +2104,7 @@ function renderTodayWorkoutReport() {
   container.innerHTML = '';
 
   const todayKey = getTodayDateKey();
-  const todayLog = (currentUser.workoutLogs && currentUser.workoutLogs[todayKey]) || { exercises: {}, scheduleDone: {} };
+  const todayLog = (currentUser.workoutLogs && currentUser.workoutLogs[todayKey]) || { exercises: {}, scheduleDone: {}, scheduleSets: {} };
   if (!todayLog.scheduleDone) todayLog.scheduleDone = {};
 
   const sportExercises = getScheduleSportExercises();
@@ -1907,6 +2149,19 @@ function renderTodayWorkoutReport() {
       badgeHtml = `<span class="rep-badge done">🔥 Перевыполнено (+${diff} ${item.unit})</span>`;
     }
 
+    let setsBreakdownHtml = '';
+    if (todayLog.scheduleSets && Array.isArray(todayLog.scheduleSets[item.name]) && todayLog.scheduleSets[item.name].length > 0) {
+      const chips = todayLog.scheduleSets[item.name].map((sVal, idx) => {
+        return `<span class="report-set-chip">${idx + 1}-й: <b>${sVal}</b></span>`;
+      }).join(' ');
+      setsBreakdownHtml = `
+        <div class="report-sets-breakdown">
+          <span style="font-size: 11px; color: var(--text-dim); margin-right: 4px; align-self: center;">По подходам:</span>
+          ${chips}
+        </div>
+      `;
+    }
+
     const row = document.createElement('div');
     row.className = `today-workout-report-item ${isCompleted ? 'done' : ''}`;
     row.innerHTML = `
@@ -1922,6 +2177,7 @@ function renderTodayWorkoutReport() {
         <span style="color: #a5b4fc;">План: <b>${item.sets} подх. × ${item.target} ${item.unit} (${totalPlan} ${item.unit})</b></span>
         <span>Факт: <b>${factDone} ${item.unit}</b> (Разница: <b style="color: ${diff >= 0 ? 'var(--accent-green)' : 'var(--accent-yellow)'}">${diff > 0 ? `+${diff}` : diff}</b>)</span>
       </div>
+      ${setsBreakdownHtml}
       <div class="today-rep-bar-bg" style="margin-top: 6px;">
         <div class="today-rep-bar-fill" style="width: ${Math.min(100, pct)}%; background-color: ${isCompleted ? 'var(--accent-green)' : (factDone > 0 ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.2)')}"></div>
       </div>
