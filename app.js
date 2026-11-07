@@ -901,7 +901,7 @@ function getUserLevelData(user) {
   const achievements = getAchievements();
   const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz')).length;
 
-  if (unlockedCount >= 18) {
+  if (unlockedCount >= 54) {
     return {
       level: 6,
       title: 'Легенда Олимпа',
@@ -912,7 +912,7 @@ function getUserLevelData(user) {
       color: '#f43f5e',
       unlockedCount
     };
-  } else if (unlockedCount >= 13) {
+  } else if (unlockedCount >= 36) {
     return {
       level: 5,
       title: 'Грандмастер',
@@ -923,7 +923,7 @@ function getUserLevelData(user) {
       color: '#38bdf8',
       unlockedCount
     };
-  } else if (unlockedCount >= 8) {
+  } else if (unlockedCount >= 20) {
     return {
       level: 4,
       title: 'Мастер OS',
@@ -934,7 +934,7 @@ function getUserLevelData(user) {
       color: '#fbbf24',
       unlockedCount
     };
-  } else if (unlockedCount >= 4) {
+  } else if (unlockedCount >= 9) {
     return {
       level: 3,
       title: 'Воин дисциплины',
@@ -945,7 +945,7 @@ function getUserLevelData(user) {
       color: '#cbd5e1',
       unlockedCount
     };
-  } else if (unlockedCount >= 1) {
+  } else if (unlockedCount >= 3) {
     return {
       level: 2,
       title: 'Искатель',
@@ -986,7 +986,7 @@ function getAvatarHtml(userOrAvatar, size = 38) {
 
   const lvl = getUserLevelData(targetUser);
   const frameClass = lvl ? lvl.frameClass : 'lvl-frame-1';
-  const frameTitle = lvl ? `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/18 достижений)` : '';
+  const frameTitle = lvl ? `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/60 достижений)` : '';
 
   let innerHtml = '';
   // 1. Gallery uploaded photo (data URL)
@@ -1039,7 +1039,7 @@ function renderUserProfile() {
   const userLevelChip = document.getElementById('userLevelChip');
   if (userLevelChip) {
     userLevelChip.textContent = lvl.prefix;
-    userLevelChip.title = `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/18 достижений)`;
+    userLevelChip.title = `Уровень ${lvl.level}: ${lvl.title} (${lvl.unlockedCount}/60 достижений)`;
   }
 
   const displayName = document.getElementById('displayName');
@@ -1061,7 +1061,7 @@ function renderUserProfile() {
   if (profileLevelBadge) {
     profileLevelBadge.textContent = `${lvl.prefix} ${lvl.title} (Ур. ${lvl.level})`;
     profileLevelBadge.className = `profile-level-badge ${lvl.frameClass}`;
-    profileLevelBadge.title = `Прогресс: ${lvl.unlockedCount} из 18 достижений`;
+    profileLevelBadge.title = `Прогресс: ${lvl.unlockedCount} из 60 достижений`;
   }
 
   const profileUsername = document.getElementById('profileUsername');
@@ -5188,12 +5188,24 @@ function renderTodayStudyReport() {
    ========================================================= */
 
 const DEFAULT_ACHIEVEMENTS = [
-  // --- 📚 ЧТЕНИЕ И КНИГИ ---
+  // --- 📚 ЧТЕНИЕ И КНИГИ (reading) ---
+  {
+    id: 'ach_read_15',
+    icon: '📖',
+    title: 'Первая глава',
+    desc: 'Прочитать первые 15 страниц в трекере книг',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'reading',
+    metric: 'pages',
+    target: 15,
+    unlockedBy: []
+  },
   {
     id: 'ach_read_50',
-    icon: '📖',
-    title: 'Первые строки',
-    desc: 'Прочитать первые 50 страниц в трекере',
+    icon: '📗',
+    title: 'Вкус к чтению',
+    desc: 'Прочитать 50 страниц полезной литературы',
     tier: 'bronze',
     coinsAward: 50,
     category: 'reading',
@@ -5202,15 +5214,39 @@ const DEFAULT_ACHIEVEMENTS = [
     unlockedBy: []
   },
   {
-    id: 'ach_book_1',
-    icon: '📕',
-    title: 'Книжный дебют',
-    desc: 'Полностью прочитать 1-ю книгу',
+    id: 'ach_read_100',
+    icon: '📘',
+    title: 'Сотня страниц',
+    desc: 'Прочитать суммарно 100 страниц',
     tier: 'bronze',
-    coinsAward: 50,
+    coinsAward: 75,
     category: 'reading',
-    metric: 'books',
-    target: 1,
+    metric: 'pages',
+    target: 100,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_read_250',
+    icon: '📙',
+    title: 'Глубокое погружение',
+    desc: 'Прочитать 250 страниц вдумчивого текста',
+    tier: 'silver',
+    coinsAward: 100,
+    category: 'reading',
+    metric: 'pages',
+    target: 250,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_read_500',
+    icon: '📕',
+    title: 'Эрудит',
+    desc: 'Преодолеть рубеж в 500 прочитанных страниц',
+    tier: 'silver',
+    coinsAward: 150,
+    category: 'reading',
+    metric: 'pages',
+    target: 500,
     unlockedBy: []
   },
   {
@@ -5219,10 +5255,70 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Книжный червь',
     desc: 'Прочитать суммарно 1 000 страниц',
     tier: 'silver',
-    coinsAward: 100,
+    coinsAward: 200,
     category: 'reading',
     metric: 'pages',
     target: 1000,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_read_2500',
+    icon: '🧐',
+    title: 'Знаток и мыслитель',
+    desc: 'Осилить 2 500 страниц книг по саморазвитию и науке',
+    tier: 'gold',
+    coinsAward: 300,
+    category: 'reading',
+    metric: 'pages',
+    target: 2500,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_read_5000',
+    icon: '🧙‍♂️',
+    title: 'Библиотекарь',
+    desc: 'Прочитать 5 000 страниц ценной литературы',
+    tier: 'platinum',
+    coinsAward: 500,
+    category: 'reading',
+    metric: 'pages',
+    target: 5000,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_book_1',
+    icon: '📕',
+    title: 'Книжный дебют',
+    desc: 'Полностью прочитать 1-ю книгу от корки до корки',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'reading',
+    metric: 'books',
+    target: 1,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_book_2',
+    icon: '📙',
+    title: 'Двойной залп',
+    desc: 'Закончить чтение 2 книг',
+    tier: 'bronze',
+    coinsAward: 75,
+    category: 'reading',
+    metric: 'books',
+    target: 2,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_book_5',
+    icon: '📚',
+    title: 'Постоянный читатель',
+    desc: 'Полностью прочитать 5 книг',
+    tier: 'silver',
+    coinsAward: 150,
+    category: 'reading',
+    metric: 'books',
+    target: 5,
     unlockedBy: []
   },
   {
@@ -5230,73 +5326,157 @@ const DEFAULT_ACHIEVEMENTS = [
     icon: '🏆',
     title: 'Книжная полка',
     desc: 'Полностью прочитать 10 книг',
-    tier: 'silver',
-    coinsAward: 100,
+    tier: 'gold',
+    coinsAward: 250,
     category: 'reading',
     metric: 'books',
     target: 10,
     unlockedBy: []
   },
   {
-    id: 'ach_read_5000',
-    icon: '🧙‍♂️',
-    title: 'Библиотекарь',
-    desc: 'Прочитать 5 000 страниц полезной литературы',
-    tier: 'gold',
-    coinsAward: 250,
-    category: 'reading',
-    metric: 'pages',
-    target: 5000,
-    unlockedBy: []
-  },
-  {
-    id: 'ach_book_100',
-    icon: '👑',
-    title: 'Легенда чтения',
-    desc: 'Закончить 100 книг (элитный читательский клуб)',
+    id: 'ach_book_25',
+    icon: '🏛️',
+    title: 'Домашняя библиотека',
+    desc: 'Прочитать 25 книг',
     tier: 'platinum',
     coinsAward: 500,
     category: 'reading',
     metric: 'books',
-    target: 100,
+    target: 25,
     unlockedBy: []
   },
 
-  // --- 📑 УЧЁБА И ACCA ---
+  // --- 📑 УЧЁБА И ACCA (study) ---
   {
-    id: 'ach_study_50',
+    id: 'ach_study_10',
     icon: '📑',
-    title: 'Студент ACCA',
-    desc: 'Разобрать первые 50 задач или учебных тем',
+    title: 'Первые шаги в науке',
+    desc: 'Разобрать первые 10 учебных задач или разделов',
     tier: 'bronze',
     coinsAward: 50,
+    category: 'study',
+    metric: 'study_tasks',
+    target: 10,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_study_25',
+    icon: '✍️',
+    title: 'Упорный студент',
+    desc: 'Решить 25 задач по профильным предметам',
+    tier: 'bronze',
+    coinsAward: 75,
+    category: 'study',
+    metric: 'study_tasks',
+    target: 25,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_study_50',
+    icon: '📊',
+    title: 'Студент ACCA',
+    desc: 'Разобрать 50 задач или учебных тем',
+    tier: 'bronze',
+    coinsAward: 100,
     category: 'study',
     metric: 'study_tasks',
     target: 50,
     unlockedBy: []
   },
   {
-    id: 'ach_pomodoro_20',
+    id: 'ach_study_100',
+    icon: '📈',
+    title: 'Финансовый аналитик',
+    desc: 'Решить 100 задач из программы подготовки',
+    tier: 'silver',
+    coinsAward: 150,
+    category: 'study',
+    metric: 'study_tasks',
+    target: 100,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_study_250',
+    icon: '💼',
+    title: 'Мастер отчётности',
+    desc: 'Решить 250 практических задач',
+    tier: 'silver',
+    coinsAward: 250,
+    category: 'study',
+    metric: 'study_tasks',
+    target: 250,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_study_500',
+    icon: '🧠',
+    title: 'Экзаменационный штурм',
+    desc: 'Решить 500 задач из Exam Kit (BPP / Kaplan)',
+    tier: 'gold',
+    coinsAward: 350,
+    category: 'study',
+    metric: 'study_tasks',
+    target: 500,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_pomodoro_1',
     icon: '⏱️',
+    title: 'Фокус внимания',
+    desc: 'Провести 1 учебную сессию глубокой концентрации',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'study',
+    metric: 'study_sessions',
+    target: 1,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_pomodoro_5',
+    icon: '🎯',
+    title: 'В потоке',
+    desc: 'Успешно завершить 5 учебных сессий',
+    tier: 'bronze',
+    coinsAward: 75,
+    category: 'study',
+    metric: 'study_sessions',
+    target: 5,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_pomodoro_20',
+    icon: '🧘',
     title: 'Мастер концентрации',
     desc: 'Провести 20 учебных сессий по расписанию',
     tier: 'silver',
-    coinsAward: 100,
+    coinsAward: 150,
     category: 'study',
     metric: 'study_sessions',
     target: 20,
     unlockedBy: []
   },
   {
-    id: 'ach_acca_500',
-    icon: '🧠',
-    title: 'Экзаменационный штурм',
-    desc: 'Решить 500 задач из Exam Kit (BPP / Kaplan)',
+    id: 'ach_pomodoro_50',
+    icon: '🔥',
+    title: 'Глубокая работа',
+    desc: 'Завершить 50 продуктивных учебных сессий',
     tier: 'gold',
-    coinsAward: 250,
+    coinsAward: 300,
     category: 'study',
-    metric: 'study_tasks',
-    target: 500,
+    metric: 'study_sessions',
+    target: 50,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_pomodoro_100',
+    icon: '🎓',
+    title: 'Профессор тайм-менеджмента',
+    desc: 'Провести 100 сессий по расписанию',
+    tier: 'platinum',
+    coinsAward: 500,
+    category: 'study',
+    metric: 'study_sessions',
+    target: 100,
     unlockedBy: []
   },
   {
@@ -5305,45 +5485,105 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Член ассоциации (ACCA Master)',
     desc: 'Завершить всю программу подготовки к экзамену ACCA',
     tier: 'platinum',
-    coinsAward: 500,
+    coinsAward: 600,
     category: 'study',
     metric: 'study_master',
     target: 1,
     unlockedBy: []
   },
 
-  // --- 💪 СПОРТ И ТРЕНИРОВКИ ---
+  // --- 💪 СПОРТ И ТРЕНИРОВКИ (sport) ---
   {
-    id: 'ach_rep_100',
+    id: 'ach_rep_25',
     icon: '💥',
-    title: 'Первая кровь',
-    desc: 'Сделать первые 100 отжиманий суммарно',
+    title: 'Разминка',
+    desc: 'Сделать первые 25 повторений упражнений',
     tier: 'bronze',
     coinsAward: 50,
+    category: 'sport',
+    metric: 'reps',
+    target: 25,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_rep_50',
+    icon: '🥊',
+    title: 'Втягивание в ритм',
+    desc: 'Сделать 50 повторений в зачет тренировок',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'sport',
+    metric: 'reps',
+    target: 50,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_rep_100',
+    icon: '⚡',
+    title: 'Первая кровь',
+    desc: 'Сделать первые 100 чистых повторений',
+    tier: 'bronze',
+    coinsAward: 75,
     category: 'sport',
     metric: 'reps',
     target: 100,
     unlockedBy: []
   },
   {
-    id: 'ach_rep_1000',
+    id: 'ach_rep_250',
     icon: '🏋️',
-    title: 'Железная сотня',
-    desc: 'Сделать 1 000 повторений упражнений',
-    tier: 'silver',
+    title: 'Стальной импульс',
+    desc: 'Сделать 250 повторений в сумме',
+    tier: 'bronze',
     coinsAward: 100,
+    category: 'sport',
+    metric: 'reps',
+    target: 250,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_rep_500',
+    icon: '🦾',
+    title: 'Неутомимый',
+    desc: 'Выполнить 500 повторений упражнений',
+    tier: 'silver',
+    coinsAward: 150,
+    category: 'sport',
+    metric: 'reps',
+    target: 500,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_rep_1000',
+    icon: '🏅',
+    title: 'Железная тысяча',
+    desc: 'Преодолеть рубеж в 1 000 повторений',
+    tier: 'silver',
+    coinsAward: 200,
     category: 'sport',
     metric: 'reps',
     target: 1000,
     unlockedBy: []
   },
   {
-    id: 'ach_rep_5000',
+    id: 'ach_rep_2500',
     icon: '⚔️',
+    title: 'Гладиатор',
+    desc: 'Выполнить 2 500 повторений',
+    tier: 'gold',
+    coinsAward: 300,
+    category: 'sport',
+    metric: 'reps',
+    target: 2500,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_rep_5000',
+    icon: '🛡️',
     title: 'Спартанец',
     desc: 'Сделать 5 000 чистых повторений',
     tier: 'gold',
-    coinsAward: 250,
+    coinsAward: 450,
     category: 'sport',
     metric: 'reps',
     target: 5000,
@@ -5351,23 +5591,107 @@ const DEFAULT_ACHIEVEMENTS = [
   },
   {
     id: 'ach_rep_10000',
-    icon: '🦾',
+    icon: '👑',
     title: 'Титановый атлет',
     desc: 'Сделать 10 000 чистых повторений (машина дисциплины)',
     tier: 'platinum',
-    coinsAward: 500,
+    coinsAward: 750,
     category: 'sport',
     metric: 'reps',
     target: 10000,
     unlockedBy: []
   },
-
-  // --- ⚡ ДИСЦИПЛИНА И РАСПИСАНИЕ ---
   {
-    id: 'ach_clean_day',
+    id: 'ach_plank_60',
+    icon: '⏱️',
+    title: 'Железный кор',
+    desc: 'Простоять суммарно 60 секунд в планке',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'sport',
+    metric: 'plank_seconds',
+    target: 60,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_plank_300',
+    icon: '🧘',
+    title: 'Гравитация повержена',
+    desc: 'Простоять 300 секунд (5 минут) в планке',
+    tier: 'silver',
+    coinsAward: 150,
+    category: 'sport',
+    metric: 'plank_seconds',
+    target: 300,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_plank_1200',
+    icon: '🗿',
+    title: 'Скала',
+    desc: 'Простоять 1 200 секунд (20 минут) суммарно в планке',
+    tier: 'gold',
+    coinsAward: 300,
+    category: 'sport',
+    metric: 'plank_seconds',
+    target: 1200,
+    unlockedBy: []
+  },
+
+  // --- ⚡ ДИСЦИПЛИНА И РАСПИСАНИЕ (discipline) ---
+  {
+    id: 'ach_slot_1',
+    icon: '🎯',
+    title: 'Первый шаг дня',
+    desc: 'Закрыть свой первый блок расписания',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'discipline',
+    metric: 'schedule_slots_done',
+    target: 1,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_slot_10',
+    icon: '📅',
+    title: 'В ритме дня',
+    desc: 'Выполнить 10 блоков расписания',
+    tier: 'bronze',
+    coinsAward: 75,
+    category: 'discipline',
+    metric: 'schedule_slots_done',
+    target: 10,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_slot_30',
+    icon: '⏰',
+    title: 'По часам',
+    desc: 'Выполнить 30 запланированных блоков',
+    tier: 'silver',
+    coinsAward: 150,
+    category: 'discipline',
+    metric: 'schedule_slots_done',
+    target: 30,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_slot_100',
+    icon: '🚀',
+    title: 'Абсолютный тайминг',
+    desc: 'Выполнить 100 блоков расписания',
+    tier: 'gold',
+    coinsAward: 300,
+    category: 'discipline',
+    metric: 'schedule_slots_done',
+    target: 100,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_clean_1',
     icon: '🛡️',
     title: 'Чистый лист',
-    desc: 'Закрыть день по расписанию без единого штрафа',
+    desc: 'Закрыть 1 день по расписанию без единого штрафа',
     tier: 'bronze',
     coinsAward: 50,
     category: 'discipline',
@@ -5376,8 +5700,68 @@ const DEFAULT_ACHIEVEMENTS = [
     unlockedBy: []
   },
   {
-    id: 'ach_streak_7',
+    id: 'ach_clean_3',
+    icon: '🌟',
+    title: 'Уверенный старт',
+    desc: '3 чистых дня без штрафов',
+    tier: 'bronze',
+    coinsAward: 75,
+    category: 'discipline',
+    metric: 'clean_days',
+    target: 3,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_clean_7',
+    icon: '⚔️',
+    title: 'Неделя чистоты',
+    desc: '7 дней соблюдения режима и 0 сум штрафов',
+    tier: 'silver',
+    coinsAward: 150,
+    category: 'discipline',
+    metric: 'clean_days',
+    target: 7,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_clean_14',
+    icon: '💎',
+    title: 'Две недели контроля',
+    desc: '14 чистых дней без пропусков',
+    tier: 'silver',
+    coinsAward: 200,
+    category: 'discipline',
+    metric: 'clean_days',
+    target: 14,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_clean_30',
+    icon: '👑',
+    title: 'Месяц безупречности',
+    desc: '30 дней дисциплины без единого срыва',
+    tier: 'gold',
+    coinsAward: 400,
+    category: 'discipline',
+    metric: 'clean_days',
+    target: 30,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_streak_3',
     icon: '🔥',
+    title: 'Огонь внутри',
+    desc: 'Удержать 3 дня непрерывного стрика',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'discipline',
+    metric: 'streak',
+    target: 3,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_streak_7',
+    icon: '⚡',
     title: 'Неделя без пощады',
     desc: 'Удержать 7 дней дисциплинарного стрика',
     tier: 'silver',
@@ -5388,12 +5772,24 @@ const DEFAULT_ACHIEVEMENTS = [
     unlockedBy: []
   },
   {
+    id: 'ach_streak_14',
+    icon: '🌪️',
+    title: 'Неудержимый',
+    desc: '14 дней непрерывной серии побед над собой',
+    tier: 'silver',
+    coinsAward: 200,
+    category: 'discipline',
+    metric: 'streak',
+    target: 14,
+    unlockedBy: []
+  },
+  {
     id: 'ach_streak_30',
-    icon: '🌟',
+    icon: '🌋',
     title: 'Месяц стали',
     desc: '30 дней непрерывного соблюдения расписания',
     tier: 'gold',
-    coinsAward: 250,
+    coinsAward: 350,
     category: 'discipline',
     metric: 'streak',
     target: 30,
@@ -5405,10 +5801,146 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Властелин времени',
     desc: '100 дней железной дисциплины и 0 сум штрафов',
     tier: 'platinum',
-    coinsAward: 500,
+    coinsAward: 750,
     category: 'discipline',
     metric: 'streak',
     target: 100,
+    unlockedBy: []
+  },
+
+  // --- 👥 ДРУЗЬЯ И СООБЩЕСТВО (social) ---
+  {
+    id: 'ach_friend_1',
+    icon: '🤝',
+    title: 'Первое рукопожатие',
+    desc: 'Добавить своего первого друга в системе',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'social',
+    metric: 'friends',
+    target: 1,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_friend_3',
+    icon: '👥',
+    title: 'Команда дисциплины',
+    desc: 'Собрать в друзьях 3 атлетов',
+    tier: 'silver',
+    coinsAward: 120,
+    category: 'social',
+    metric: 'friends',
+    target: 3,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_friend_5',
+    icon: '🏆',
+    title: 'Круг доверия',
+    desc: 'Иметь 5 подтвержденных друзей в профиле',
+    tier: 'gold',
+    coinsAward: 250,
+    category: 'social',
+    metric: 'friends',
+    target: 5,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_friend_10',
+    icon: '👑',
+    title: 'Лидер комьюнити',
+    desc: 'Собрать 10 друзей и единомышленников',
+    tier: 'platinum',
+    coinsAward: 500,
+    category: 'social',
+    metric: 'friends',
+    target: 10,
+    unlockedBy: []
+  },
+
+  // --- 🪙 МАГАЗИН, МОНЕТЫ И СТИЛЬ (shop) ---
+  {
+    id: 'ach_avatar_set',
+    icon: '📷',
+    title: 'Индивидуальность',
+    desc: 'Установить кастомную аватарку (фото, эмодзи или арт)',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'shop',
+    metric: 'avatar_custom',
+    target: 1,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_incognito',
+    icon: '🌫️',
+    title: 'Агент под прикрытием',
+    desc: 'Активировать режим приватности (Инкогнито)',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'shop',
+    metric: 'incognito',
+    target: 1,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_coins_250',
+    icon: '🪙',
+    title: 'Первый капитал',
+    desc: 'Накопить на балансе 250 Coins',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'shop',
+    metric: 'coins_earned',
+    target: 250,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_coins_500',
+    icon: '💰',
+    title: 'Золотой запас',
+    desc: 'Накопить 500 Coins на счету',
+    tier: 'silver',
+    coinsAward: 100,
+    category: 'shop',
+    metric: 'coins_earned',
+    target: 500,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_coins_2000',
+    icon: '🏦',
+    title: 'Дисциплинарный магнат',
+    desc: 'Накопить 2 000 Coins',
+    tier: 'gold',
+    coinsAward: 300,
+    category: 'shop',
+    metric: 'coins_earned',
+    target: 2000,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_shop_1',
+    icon: '🛍️',
+    title: 'Первая покупка',
+    desc: 'Купить свой первый предмет в магазине наград',
+    tier: 'silver',
+    coinsAward: 100,
+    category: 'shop',
+    metric: 'inventory',
+    target: 1,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_shop_3',
+    icon: '💎',
+    title: 'Коллекционер стиля',
+    desc: 'Приобрести 3 эксклюзивных предмета в магазине',
+    tier: 'gold',
+    coinsAward: 250,
+    category: 'shop',
+    metric: 'inventory',
+    target: 3,
     unlockedBy: []
   }
 ];
@@ -5416,7 +5948,12 @@ const DEFAULT_ACHIEVEMENTS = [
 function getAchievements() {
   try {
     const raw = localStorage.getItem(APP_ACHIEVEMENTS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length >= DEFAULT_ACHIEVEMENTS.length) {
+        return parsed;
+      }
+    }
   } catch (e) {}
   return JSON.parse(JSON.stringify(DEFAULT_ACHIEVEMENTS));
 }
@@ -5428,8 +5965,24 @@ function saveAchievements(catalog) {
 }
 
 function initAchievements() {
-  const existing = localStorage.getItem(APP_ACHIEVEMENTS_KEY);
-  if (!existing) {
+  try {
+    const existing = localStorage.getItem(APP_ACHIEVEMENTS_KEY);
+    if (!existing) {
+      saveAchievements(DEFAULT_ACHIEVEMENTS);
+    } else {
+      const parsed = JSON.parse(existing);
+      if (!Array.isArray(parsed) || parsed.length < DEFAULT_ACHIEVEMENTS.length) {
+        const merged = DEFAULT_ACHIEVEMENTS.map(def => {
+          const old = Array.isArray(parsed) ? parsed.find(a => a.id === def.id) : null;
+          return {
+            ...def,
+            unlockedBy: old ? (old.unlockedBy || []) : []
+          };
+        });
+        saveAchievements(merged);
+      }
+    }
+  } catch (e) {
     saveAchievements(DEFAULT_ACHIEVEMENTS);
   }
   updateTrophyTopBadge();
@@ -5471,11 +6024,17 @@ function checkAutomaticAchievements() {
   });
 
   let totalReps = 0;
+  let totalPlankSeconds = 0;
   if (currentUser.workoutLogs) {
     Object.entries(currentUser.workoutLogs).forEach(([date, log]) => {
       if (date >= baseDate && log.exercises) {
-        Object.values(log.exercises).forEach(ex => {
-          totalReps += (parseInt(ex.done, 10) || 0);
+        Object.entries(log.exercises).forEach(([id, ex]) => {
+          const val = (parseInt(ex.done, 10) || 0);
+          totalReps += val;
+          const exName = (ex.name || id || '').toLowerCase();
+          if (exName.includes('планк') || id === 'ex_plank') {
+            totalPlankSeconds += val;
+          }
         });
       }
     });
@@ -5501,20 +6060,24 @@ function checkAutomaticAchievements() {
   }
 
   // Also check schedule completions
-  if (currentUser.scheduleCompletions && currentUser.scheduleSlots) {
+  let totalSlotsDone = 0;
+  if (currentUser.scheduleCompletions) {
     Object.entries(currentUser.scheduleCompletions).forEach(([dateStr, slotIds]) => {
-      if (dateStr >= baseDate) {
-        slotIds.forEach(slotId => {
-          const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
-          if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
-            totalStudySessions++;
-            if (slot.exercises) {
-              slot.exercises.forEach(ex => {
-                totalStudyTasks += (parseInt(ex.target, 10) || 1);
-              });
+      if (dateStr >= baseDate && Array.isArray(slotIds)) {
+        totalSlotsDone += slotIds.length;
+        if (currentUser.scheduleSlots) {
+          slotIds.forEach(slotId => {
+            const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
+            if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
+              totalStudySessions++;
+              if (slot.exercises) {
+                slot.exercises.forEach(ex => {
+                  totalStudyTasks += (parseInt(ex.target, 10) || 1);
+                });
+              }
             }
-          }
-        });
+          });
+        }
       }
     });
   }
@@ -5538,6 +6101,11 @@ function checkAutomaticAchievements() {
   }
 
   const streak = (todayKey >= baseDate ? (currentUser.streak || currentUser.studyStreak || 0) : 0);
+  const friendsCount = (currentUser.friends || []).length;
+  const totalCoins = currentUser.coins || 0;
+  const inventoryCount = (currentUser.inventory || []).length;
+  const hasCustomAvatar = (currentUser.avatar && (currentUser.avatar.type === 'image' || currentUser.avatar.type === 'shop' || (currentUser.avatar.type === 'text' && currentUser.avatar.text))) ? 1 : 0;
+  const isIncognito = currentUser.isPrivate ? 1 : 0;
 
   achievements.forEach(ach => {
     if (!ach.unlockedBy) ach.unlockedBy = [];
@@ -5549,11 +6117,18 @@ function checkAutomaticAchievements() {
       if (ach.metric === 'pages' && totalPagesRead >= ach.target) meetsCondition = true;
       if (ach.metric === 'books' && booksCompleted >= ach.target) meetsCondition = true;
       if (ach.metric === 'reps' && totalReps >= ach.target) meetsCondition = true;
+      if (ach.metric === 'plank_seconds' && totalPlankSeconds >= ach.target) meetsCondition = true;
       if (ach.metric === 'study_tasks' && totalStudyTasks >= ach.target) meetsCondition = true;
       if (ach.metric === 'study_sessions' && totalStudySessions >= ach.target) meetsCondition = true;
       if (ach.metric === 'study_master' && accaStudyTextPages >= 480) meetsCondition = true;
+      if (ach.metric === 'schedule_slots_done' && totalSlotsDone >= ach.target) meetsCondition = true;
       if (ach.metric === 'clean_days' && cleanDays >= ach.target) meetsCondition = true;
       if (ach.metric === 'streak' && streak >= ach.target) meetsCondition = true;
+      if (ach.metric === 'friends' && friendsCount >= ach.target) meetsCondition = true;
+      if (ach.metric === 'avatar_custom' && hasCustomAvatar >= ach.target) meetsCondition = true;
+      if (ach.metric === 'incognito' && isIncognito >= ach.target) meetsCondition = true;
+      if (ach.metric === 'coins_earned' && totalCoins >= ach.target) meetsCondition = true;
+      if (ach.metric === 'inventory' && inventoryCount >= ach.target) meetsCondition = true;
 
       if (meetsCondition) {
         ach.unlockedBy.push(username);
@@ -5601,7 +6176,7 @@ function closeAchievementsModal() {
 
 function setAchievementFilter(filter) {
   currentAchievementFilter = filter;
-  ['all', 'reading', 'study', 'sport', 'discipline', 'unlocked'].forEach(f => {
+  ['all', 'reading', 'study', 'sport', 'discipline', 'social', 'shop', 'unlocked'].forEach(f => {
     const btn = document.getElementById(`achFilter_${f}`);
     if (btn) {
       if (f === filter) btn.classList.add('active');
@@ -5623,6 +6198,9 @@ function renderAchievements() {
   const totalCount = achievements.length;
   const unlockedCount = achievements.filter(a => (a.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz')).length;
   const overallPct = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
+
+  const allFilterBtn = document.getElementById('achFilter_all');
+  if (allFilterBtn) allFilterBtn.textContent = `Все (${totalCount})`;
 
   const counterEl = document.getElementById('steamTrophyCounter');
   if (counterEl) counterEl.textContent = `${unlockedCount} / ${totalCount} (${overallPct}%)`;
@@ -5672,10 +6250,18 @@ function renderAchievements() {
 
   let booksCompleted = isPastBase ? (currentUser.books || []).filter(b => b.status === 'completed' || (parseInt(b.currentPage, 10) >= parseInt(b.totalPages, 10) && parseInt(b.totalPages, 10) > 0)).length : 0;
   let totalReps = 0;
+  let totalPlankSeconds = 0;
   if (isPastBase && currentUser.workoutLogs) {
     Object.entries(currentUser.workoutLogs).forEach(([date, l]) => {
       if (date >= baseDate && l.exercises) {
-        Object.values(l.exercises).forEach(e => { totalReps += (parseInt(e.done, 10) || 0); });
+        Object.entries(l.exercises).forEach(([id, e]) => {
+          const val = (parseInt(e.done, 10) || 0);
+          totalReps += val;
+          const exName = (e.name || id || '').toLowerCase();
+          if (exName.includes('планк') || id === 'ex_plank') {
+            totalPlankSeconds += val;
+          }
+        });
       }
     });
   }
@@ -5697,18 +6283,22 @@ function renderAchievements() {
       }
     });
   }
-  if (isPastBase && currentUser.scheduleCompletions && currentUser.scheduleSlots) {
+  let totalSlotsDone = 0;
+  if (isPastBase && currentUser.scheduleCompletions) {
     Object.entries(currentUser.scheduleCompletions).forEach(([dateStr, slotIds]) => {
-      if (dateStr >= baseDate) {
-        slotIds.forEach(slotId => {
-          const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
-          if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
-            totalStudySessions++;
-            if (slot.exercises) {
-              slot.exercises.forEach(ex => { totalStudyTasks += (parseInt(ex.target, 10) || 1); });
+      if (dateStr >= baseDate && Array.isArray(slotIds)) {
+        totalSlotsDone += slotIds.length;
+        if (currentUser.scheduleSlots) {
+          slotIds.forEach(slotId => {
+            const slot = currentUser.scheduleSlots.find(s => s.id === slotId);
+            if (slot && (slot.category === 'work' || (slot.name && slot.name.toLowerCase().includes('acca')))) {
+              totalStudySessions++;
+              if (slot.exercises) {
+                slot.exercises.forEach(ex => { totalStudyTasks += (parseInt(ex.target, 10) || 1); });
+              }
             }
-          }
-        });
+          });
+        }
       }
     });
   }
@@ -5732,6 +6322,13 @@ function renderAchievements() {
     });
   }
 
+  const streak = isPastBase ? (currentUser.streak || currentUser.studyStreak || 0) : 0;
+  const friendsCount = (currentUser.friends || []).length;
+  const totalCoins = currentUser.coins || 0;
+  const inventoryCount = (currentUser.inventory || []).length;
+  const hasCustomAvatar = (currentUser.avatar && (currentUser.avatar.type === 'image' || currentUser.avatar.type === 'shop' || (currentUser.avatar.type === 'text' && currentUser.avatar.text))) ? 1 : 0;
+  const isIncognito = currentUser.isPrivate ? 1 : 0;
+
   filtered.forEach(ach => {
     const isUnlocked = (ach.unlockedBy || []).some(u => u.toLowerCase() === username && u.toLowerCase() !== 'shahboz');
     const tierLabels = {
@@ -5750,8 +6347,15 @@ function renderAchievements() {
     else if (ach.metric === 'study_sessions') { curVal = totalStudySessions; unitLabel = 'сессий'; }
     else if (ach.metric === 'study_master') { curVal = accaStudyTextPages; unitLabel = 'стр. Study Text'; }
     else if (ach.metric === 'reps') { curVal = totalReps; unitLabel = 'повт.'; }
+    else if (ach.metric === 'plank_seconds') { curVal = totalPlankSeconds; unitLabel = 'сек.'; }
+    else if (ach.metric === 'schedule_slots_done') { curVal = totalSlotsDone; unitLabel = 'блоков'; }
     else if (ach.metric === 'clean_days') { curVal = cleanDays; unitLabel = 'дн.'; }
-    else if (ach.metric === 'streak') { curVal = currentUser.streak || currentUser.studyStreak || 0; unitLabel = 'дн.'; }
+    else if (ach.metric === 'streak') { curVal = streak; unitLabel = 'дн.'; }
+    else if (ach.metric === 'friends') { curVal = friendsCount; unitLabel = 'друзей'; }
+    else if (ach.metric === 'avatar_custom') { curVal = hasCustomAvatar; unitLabel = 'выполнено'; }
+    else if (ach.metric === 'incognito') { curVal = isIncognito; unitLabel = 'выполнено'; }
+    else if (ach.metric === 'coins_earned') { curVal = totalCoins; unitLabel = 'Coins'; }
+    else if (ach.metric === 'inventory') { curVal = inventoryCount; unitLabel = 'предм.'; }
     else { curVal = isUnlocked ? ach.target : 0; }
 
     const remaining = Math.max(0, ach.target - curVal);
@@ -6394,7 +6998,7 @@ function renderLeaderboard() {
 
       nameHtml = `
         <div style="font-weight: 800; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;" class="${item.equippedFont}">
-          <span class="user-level-chip" title="Уровень ${itemLvl.level}: ${itemLvl.title} (${itemLvl.unlockedCount}/18 достижений)">${itemLvl.prefix}</span>
+          <span class="user-level-chip" title="Уровень ${itemLvl.level}: ${itemLvl.title} (${itemLvl.unlockedCount}/${achievements.length} достижений)">${itemLvl.prefix}</span>
           <span>${escapeHtml(item.displayName)}</span> ${badgeHtml} ${selfPrivacyTag} ${isMe ? '<span style="font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 2px;">(Вы)</span>' : ''}
         </div>
       `;
@@ -6443,7 +7047,7 @@ function renderLeaderboard() {
       </td>
       <td style="text-align: center;">
         <span style="font-weight: 800; color: #a5b4fc;">${item.unlockedCount}</span>
-        <span style="font-size: 11px; color: var(--text-dim);"> / 18</span>
+        <span style="font-size: 11px; color: var(--text-dim);"> / ${achievements.length}</span>
       </td>
       <td style="text-align: right;">
         <span class="gold-coins-pill">🪙 ${item.coins}</span>
