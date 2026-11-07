@@ -2377,3 +2377,105 @@ body {
 .day-checkbox-label input[type="checkbox"] {
   cursor: pointer;
 }
+
+/* Book Tracker Styles */
+.book-section-card {
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.book-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
+}
+
+.book-card.completed {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.book-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.book-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+}
+
+.book-icon {
+  font-size: 18px;
+}
+
+.book-author {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  margin-left: 24px;
+}
+
+.book-progress-box {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  margin-bottom: 8px;
+}
+
+.book-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.book-pages-counter b {
+  color: #38bdf8;
+}
+
+.book-pct-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent-green);
+}
+
+.book-sub-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.book-sub-stats b {
+  color: white;
+}
+
+.book-logging-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.book-log-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
