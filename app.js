@@ -1145,19 +1145,77 @@ function saveCustomCategory(e) {
    SCHEDULE TAB LOGIC (С упражнениями и штрафами за блок)
    ========================================================= */
 
+let currentScheduleViewDate = getTodayDateKey();
+
+function getScheduleViewDateKey() {
+  return currentScheduleViewDate || getTodayDateKey();
+}
+
+function changeScheduleViewDate(offsetDays) {
+  const baseKey = getScheduleViewDateKey();
+  const cur = new Date(baseKey + 'T12:00:00');
+  cur.setDate(cur.getDate() + offsetDays);
+  currentScheduleViewDate = cur.toISOString().split('T')[0];
+  renderSchedule();
+}
+
+function resetScheduleViewDateToToday() {
+  currentScheduleViewDate = getTodayDateKey();
+  renderSchedule();
+}
+
 function renderSchedule() {
   if (!currentUser) return;
   const listEl = document.getElementById('timelineList');
   if (!listEl) return;
 
-  const slots = currentUser.scheduleSlots || [];
+  const viewDateKey = getScheduleViewDateKey();
+  const todayKey = getTodayDateKey();
+  const isViewingToday = (viewDateKey === todayKey);
+
+  const viewDateObj = new Date(viewDateKey + 'T12:00:00');
+  const viewDayOfWeek = viewDateObj.getDay(); // 0 = Вс, 1 = Пн, ...
+
+  // Update nav label in UI
+  const navLabelEl = document.getElementById('scheduleNavDateLabel');
+  if (navLabelEl) {
+    if (isViewingToday) {
+      navLabelEl.textContent = 'Сегодня';
+    } else {
+      const dateOptions = { day: 'numeric', month: 'short' };
+      navLabelEl.textContent = viewDateObj.toLocaleDateString('ru-RU', dateOptions);
+    }
+  }
+
+  const allSlots = currentUser.scheduleSlots || [];
+
+  // Filter slots for the viewed date
+  const slots = allSlots.filter(slot => {
+    if (!slot.recurrenceType || slot.recurrenceType === 'daily') return true;
+    if (slot.recurrenceType === 'today_only' || slot.recurrenceType === 'specific_date') {
+      return slot.specificDate === viewDateKey;
+    }
+    if (slot.recurrenceType === 'weekdays' && Array.isArray(slot.daysOfWeek)) {
+      return slot.daysOfWeek.includes(viewDayOfWeek);
+    }
+    return true;
+  });
+
   slots.sort((a, b) => a.start.localeCompare(b.start));
 
-  const todayKey = getTodayDateKey();
   if (!currentUser.scheduleCompletions) currentUser.scheduleCompletions = {};
-  const completedSlots = currentUser.scheduleCompletions[todayKey] || [];
+  const completedSlots = currentUser.scheduleCompletions[viewDateKey] || [];
 
   listEl.innerHTML = '';
+
+  if (slots.length === 0) {
+    listEl.innerHTML = `
+      <div style="padding: 24px 12px; text-align: center; color: var(--text-dim); background: rgba(0,0,0,0.2); border-radius: var(--radius-md); border: 1px dashed rgba(255,255,255,0.08); font-size: 13px;">
+        На этот день нет запланированных блоков.<br>
+        <span style="color: #38bdf8; font-weight: 700; cursor: pointer; display: inline-block; margin-top: 6px;" onclick="openAddSlotModal()">+ Добавить блок на этот день</span>
+      </div>
+    `;
+  }
 
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -1166,12 +1224,26 @@ function renderSchedule() {
   slots.forEach(slot => {
     const startMins = timeToMinutes(slot.start);
     const endMins = timeToMinutes(slot.end);
-    const isNow = currentMinutes >= startMins && currentMinutes < endMins;
+    const isNow = isViewingToday && currentMinutes >= startMins && currentMinutes < endMins;
     const isCompleted = completedSlots.includes(slot.id);
 
     if (isNow) activeBlock = slot;
 
     const cat = getCategory(slot.category);
+
+    // Day / Recurrence badge
+    let dayBadgeHtml = '';
+    if (slot.recurrenceType === 'today_only') {
+      dayBadgeHtml = `<span class="timeline-day-badge today">🎯 Только сегодня</span>`;
+    } else if (slot.recurrenceType === 'specific_date') {
+      const parts = (slot.specificDate || '').split('-');
+      const label = parts.length === 3 ? `${parseInt(parts[2], 10)}.${parts[1]}` : slot.specificDate;
+      dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${label}</span>`;
+    } else if (slot.recurrenceType === 'weekdays' && Array.isArray(slot.daysOfWeek)) {
+      const dayNames = { 1: 'Пн', 2: 'Вт', 3: 'Ср', 4: 'Чт', 5: 'Пт', 6: 'Сб', 0: 'Вс' };
+      const label = slot.daysOfWeek.map(d => dayNames[d] || d).join(', ');
+      dayBadgeHtml = `<span class="timeline-day-badge weekdays">📆 ${label}</span>`;
+    }
 
     // Exercise badges subline (Рисунок 2)
     let exerciseSubHtml = '';
@@ -1198,8 +1270,9 @@ function renderSchedule() {
       <div class="cat-indicator" style="background-color: ${cat.color};"></div>
       <div class="timeline-info-col" onclick="openEditSlotModal('${slot.id}')">
         <div class="slot-title">${cat.emoji} ${escapeHtml(slot.name)}</div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+        <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap;">
           <span class="slot-category-name">${cat.name}</span>
+          ${dayBadgeHtml}
           ${penaltyBadge}
         </div>
         ${exerciseSubHtml}
@@ -1269,11 +1342,11 @@ function toggleCurrentBlock() {
 
 function toggleSlotCompletion(slotId) {
   if (!currentUser) return;
-  const todayKey = getTodayDateKey();
+  const viewDateKey = getScheduleViewDateKey();
   if (!currentUser.scheduleCompletions) currentUser.scheduleCompletions = {};
-  if (!currentUser.scheduleCompletions[todayKey]) currentUser.scheduleCompletions[todayKey] = [];
+  if (!currentUser.scheduleCompletions[viewDateKey]) currentUser.scheduleCompletions[viewDateKey] = [];
 
-  const list = currentUser.scheduleCompletions[todayKey];
+  const list = currentUser.scheduleCompletions[viewDateKey];
   const idx = list.indexOf(slotId);
 
   if (idx > -1) {
@@ -1289,6 +1362,14 @@ function toggleSlotCompletion(slotId) {
   renderReport();
 }
 
+function onSlotRecurrenceTypeChange(selectEl) {
+  const val = selectEl.value;
+  const dateGroup = document.getElementById('slotSpecificDateGroup');
+  const weekdaysGroup = document.getElementById('slotWeekdaysGroup');
+  if (dateGroup) dateGroup.classList.toggle('hidden', val !== 'specific_date');
+  if (weekdaysGroup) weekdaysGroup.classList.toggle('hidden', val !== 'weekdays');
+}
+
 // Modal: Add / Edit Block with Exercises and Configurable Penalty
 function openAddSlotModal() {
   document.getElementById('modalSlotTitle').textContent = 'Новый блок времени';
@@ -1298,6 +1379,22 @@ function openAddSlotModal() {
   document.getElementById('slotEnd').value = '11:00';
   document.getElementById('slotPenalty').value = '5000';
   populateCategorySelect('work');
+
+  const recEl = document.getElementById('slotRecurrenceType');
+  const viewDateKey = getScheduleViewDateKey();
+  const todayKey = getTodayDateKey();
+  if (recEl) {
+    if (viewDateKey !== todayKey) {
+      recEl.value = 'specific_date';
+    } else {
+      recEl.value = 'daily';
+    }
+    onSlotRecurrenceTypeChange(recEl);
+  }
+  const dateInput = document.getElementById('slotSpecificDate');
+  if (dateInput) dateInput.value = viewDateKey;
+
+  document.querySelectorAll('input[name="slotWeekday"]').forEach(cb => { cb.checked = false; });
 
   document.getElementById('slotExercisesContainer').innerHTML = '';
   updateSlotExercisesHeaderVisibility();
@@ -1317,6 +1414,20 @@ function openEditSlotModal(slotId) {
   document.getElementById('slotEnd').value = slot.end;
   document.getElementById('slotPenalty').value = slot.penalty !== undefined ? slot.penalty : 5000;
   populateCategorySelect(slot.category || 'work');
+
+  const recEl = document.getElementById('slotRecurrenceType');
+  if (recEl) {
+    recEl.value = slot.recurrenceType || 'daily';
+    onSlotRecurrenceTypeChange(recEl);
+  }
+  const dateInput = document.getElementById('slotSpecificDate');
+  if (dateInput) {
+    dateInput.value = slot.specificDate || getScheduleViewDateKey();
+  }
+  const daysOfWeek = slot.daysOfWeek || [];
+  document.querySelectorAll('input[name="slotWeekday"]').forEach(cb => {
+    cb.checked = daysOfWeek.includes(parseInt(cb.value, 10));
+  });
 
   // Render exercises
   renderSlotExercisesInModal(slot.exercises || []);
@@ -1555,6 +1666,24 @@ function saveScheduleSlot(e) {
   const category = document.getElementById('slotCategory').value;
   const penalty = parseInt(document.getElementById('slotPenalty').value, 10) || 0;
 
+  // Extract Recurrence / Day
+  const recEl = document.getElementById('slotRecurrenceType');
+  const recurrenceType = recEl ? recEl.value : 'daily';
+  let specificDate = '';
+  if (recurrenceType === 'today_only') {
+    specificDate = getTodayDateKey();
+  } else if (recurrenceType === 'specific_date') {
+    const dInp = document.getElementById('slotSpecificDate');
+    specificDate = (dInp && dInp.value) ? dInp.value : getScheduleViewDateKey();
+  }
+
+  const daysOfWeek = [];
+  if (recurrenceType === 'weekdays') {
+    document.querySelectorAll('input[name="slotWeekday"]:checked').forEach(cb => {
+      daysOfWeek.push(parseInt(cb.value, 10));
+    });
+  }
+
   // Extract exercises from modal container
   const exercises = [];
   const rows = document.querySelectorAll('#slotExercisesContainer .slot-ex-row');
@@ -1578,6 +1707,9 @@ function saveScheduleSlot(e) {
       slot.category = category;
       slot.penalty = penalty;
       slot.exercises = exercises;
+      slot.recurrenceType = recurrenceType;
+      slot.specificDate = specificDate;
+      slot.daysOfWeek = daysOfWeek;
     }
   } else {
     currentUser.scheduleSlots.push({
@@ -1587,7 +1719,10 @@ function saveScheduleSlot(e) {
       end,
       category,
       penalty,
-      exercises
+      exercises,
+      recurrenceType,
+      specificDate,
+      daysOfWeek
     });
   }
 
@@ -2524,9 +2659,23 @@ function renderReport() {
   renderPenalties();
 }
 
+function isSlotActiveOnDate(slot, dateKey, dayOfWeek) {
+  if (!slot) return false;
+  if (!slot.recurrenceType || slot.recurrenceType === 'daily') return true;
+  if (slot.recurrenceType === 'today_only' || slot.recurrenceType === 'specific_date') {
+    return slot.specificDate === dateKey;
+  }
+  if (slot.recurrenceType === 'weekdays' && Array.isArray(slot.daysOfWeek)) {
+    return slot.daysOfWeek.includes(dayOfWeek);
+  }
+  return true;
+}
+
 function getScheduleSportExercises() {
   if (!currentUser || !currentUser.scheduleSlots) return [];
-  const sportSlots = currentUser.scheduleSlots.filter(s => s.category === 'sport');
+  const todayKey = getTodayDateKey();
+  const dayOfWeek = (new Date()).getDay();
+  const sportSlots = currentUser.scheduleSlots.filter(s => s.category === 'sport' && isSlotActiveOnDate(s, todayKey, dayOfWeek));
   const result = [];
   sportSlots.forEach(slot => {
     const exs = slot.exercises || [];
@@ -3712,7 +3861,10 @@ function renderStudyHistory() {
 
 function getScheduleStudyExercises() {
   if (!currentUser || !currentUser.scheduleSlots) return [];
+  const todayKey = getTodayDateKey();
+  const dayOfWeek = (new Date()).getDay();
   const studySlots = currentUser.scheduleSlots.filter(s => {
+    if (!isSlotActiveOnDate(s, todayKey, dayOfWeek)) return false;
     if (s.category === 'work') return true;
     const cat = (currentUser.customCategories || []).find(c => c.id === s.category);
     if (cat && (cat.name.toLowerCase().includes('учеб') || cat.name.toLowerCase().includes('книг') || cat.name.toLowerCase().includes('чтен') || cat.name.toLowerCase().includes('acca'))) return true;
@@ -4862,7 +5014,7 @@ const SHOP_ITEMS = [
     category: 'font',
     name: '🔥 Огненный шрифт («Буквы горят»)',
     desc: 'Буквы пылают живым огненным свечением с анимацией языков пламени!',
-    price: 150,
+    price: 350,
     cssClass: 'user-font-fire',
     previewHtml: '<span class="user-font-fire">@USER</span>'
   },
@@ -4871,7 +5023,7 @@ const SHOP_ITEMS = [
     category: 'font',
     name: '⚡ Кибер Неон (Electric Cyan)',
     desc: 'Футуристическое неоновое свечение в стиле Cyberpunk.',
-    price: 120,
+    price: 300,
     cssClass: 'user-font-cyber',
     previewHtml: '<span class="user-font-cyber">@USER</span>'
   },
@@ -4880,7 +5032,7 @@ const SHOP_ITEMS = [
     category: 'font',
     name: '👑 Королевское Золото (Imperial Gold)',
     desc: 'Роскошное металлизированное золотое сияние для победителей.',
-    price: 200,
+    price: 400,
     cssClass: 'user-font-gold',
     previewHtml: '<span class="user-font-gold">@USER</span>'
   },
@@ -4889,7 +5041,7 @@ const SHOP_ITEMS = [
     category: 'font',
     name: '🟢 Зелёная Матрица (Matrix Code)',
     desc: 'Кибернетическое изумрудное свечение хакера дисциплины.',
-    price: 100,
+    price: 250,
     cssClass: 'user-font-matrix',
     previewHtml: '<span class="user-font-matrix">@USER</span>'
   },
@@ -4900,7 +5052,7 @@ const SHOP_ITEMS = [
     category: 'badge',
     name: '⚡ Золотая молния (Telegram Plus)',
     desc: 'Премиум значок энергии Telegram Plus рядом с вашим логином.',
-    price: 80,
+    price: 250,
     badgeHtml: '<span class="tg-badge tg-badge-lightning">⚡</span>',
     previewHtml: '@USER <span class="tg-badge tg-badge-lightning">⚡</span>'
   },
@@ -4909,7 +5061,7 @@ const SHOP_ITEMS = [
     category: 'badge',
     name: '💎 Сияющий кристалл (Telegram Diamond)',
     desc: 'Драгоценный алмаз дисциплины с ярким неоновым блеском.',
-    price: 100,
+    price: 280,
     badgeHtml: '<span class="tg-badge tg-badge-diamond">💎</span>',
     previewHtml: '@USER <span class="tg-badge tg-badge-diamond">💎</span>'
   },
@@ -4918,7 +5070,7 @@ const SHOP_ITEMS = [
     category: 'badge',
     name: '👑 Корона Дисциплины (Discipline King)',
     desc: 'Символ абсолютной верности своему графику и целям.',
-    price: 180,
+    price: 380,
     badgeHtml: '<span class="tg-badge tg-badge-crown">👑</span>',
     previewHtml: '@USER <span class="tg-badge tg-badge-crown">👑</span>'
   },
@@ -4927,7 +5079,7 @@ const SHOP_ITEMS = [
     category: 'badge',
     name: '🔥 Огонь Стрика (Streak Fire)',
     desc: 'Подтверждение того, что ваш тренировочный и учебный стрик пылает!',
-    price: 70,
+    price: 250,
     badgeHtml: '<span class="tg-badge tg-badge-fire">🔥</span>',
     previewHtml: '@USER <span class="tg-badge tg-badge-fire">🔥</span>'
   },
@@ -4936,7 +5088,7 @@ const SHOP_ITEMS = [
     category: 'badge',
     name: '🚀 Ракета Прорыва (Rocket Star)',
     desc: 'Стремительное ускорение в карьере, учёбе ACCA и спорте.',
-    price: 90,
+    price: 260,
     badgeHtml: '<span class="tg-badge tg-badge-rocket">🚀</span>',
     previewHtml: '@USER <span class="tg-badge tg-badge-rocket">🚀</span>'
   },
@@ -4945,7 +5097,7 @@ const SHOP_ITEMS = [
     category: 'badge',
     name: '🛡️ Щит Спартанца (Spartan Shield)',
     desc: 'Знак железной защиты от лени и пропусков тренировок.',
-    price: 110,
+    price: 290,
     badgeHtml: '<span class="tg-badge tg-badge-shield">🛡️</span>',
     previewHtml: '@USER <span class="tg-badge tg-badge-shield">🛡️</span>'
   },
@@ -4956,7 +5108,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '🦁 Золотой Лев (King Lion)',
     desc: 'Символ абсолютной силы, благородства и лидерства',
-    price: 150,
+    price: 350,
     avatarData: {
       icon: '🦁',
       bg: 'linear-gradient(135deg, #b45309, #78350f)',
@@ -4968,7 +5120,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '🛡️ Спартанский Воин (Spartan Helm)',
     desc: 'Символ несокрушимой воли, дисциплины и защиты от лени',
-    price: 130,
+    price: 300,
     avatarData: {
       icon: '🛡️',
       bg: 'linear-gradient(135deg, #881337, #4c0519)',
@@ -4980,7 +5132,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '🐺 Одинокий Волк (Sigma Wolf)',
     desc: 'Несгибаемый дух, автономность и тихая упорная победа',
-    price: 120,
+    price: 270,
     avatarData: {
       icon: '🐺',
       bg: 'linear-gradient(135deg, #1e293b, #0f172a)',
@@ -4992,7 +5144,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '🦅 Огненный Феникс (Fire Phoenix)',
     desc: 'Возрождение после любого срыва, ещё сильнее и дисциплинированнее',
-    price: 160,
+    price: 380,
     avatarData: {
       icon: '🦅',
       bg: 'linear-gradient(135deg, #ea580c, #7c2d12)',
@@ -5004,7 +5156,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '🐉 Неоновый Дракон (Cyber Dragon)',
     desc: 'Огнедышащая мощь, безграничные цели и победа над слабостями',
-    price: 140,
+    price: 320,
     avatarData: {
       icon: '🐉',
       bg: 'linear-gradient(135deg, #065f46, #022c22)',
@@ -5016,7 +5168,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '🥷 Теневой Ниндзя (Shadow Shinobi)',
     desc: 'Тишина, скорость, режим и безупречная точность самурая',
-    price: 110,
+    price: 250,
     avatarData: {
       icon: '🥷',
       bg: 'linear-gradient(135deg, #312e81, #1e1b4b)',
@@ -5028,7 +5180,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '👑 Император Дисциплины (Imperial Crown)',
     desc: 'Для тех, кто закрывает 100% расписания и держит слово перед собой',
-    price: 180,
+    price: 450,
     avatarData: {
       icon: '👑',
       bg: 'linear-gradient(135deg, #d97706, #451a03)',
@@ -5040,7 +5192,7 @@ const SHOP_ITEMS = [
     category: 'avatar',
     name: '🚀 Космический Странник (Cosmic Voyager)',
     desc: 'Выход за пределы орбиты, покорение новых высот в жизни и карьере',
-    price: 125,
+    price: 280,
     avatarData: {
       icon: '🚀',
       bg: 'linear-gradient(135deg, #0284c7, #082f49)',
