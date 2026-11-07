@@ -1663,9 +1663,9 @@ body {
   backdrop-filter: blur(25px);
   -webkit-backdrop-filter: blur(25px);
   border-top: 1px solid var(--border);
-  padding: 10px 12px calc(var(--safe-bottom) + 6px);
+  padding: 8px 4px calc(var(--safe-bottom) + 6px);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   z-index: 100;
 }
 
@@ -1675,20 +1675,22 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   cursor: pointer;
   color: var(--text-dim);
   transition: color 0.2s;
+  padding: 2px 0;
 }
 
 .nav-tab-item .tab-icon {
-  font-size: 20px;
+  font-size: 19px;
   transition: transform 0.2s;
 }
 
 .nav-tab-item .tab-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .nav-tab-item.active {
