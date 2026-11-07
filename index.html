@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -207,9 +207,26 @@
                 <button class="period-btn active" id="btnPeriodAll" onclick="setReportPeriod('all')">Всё время</button>
                 <button class="period-btn" id="btnPeriodMonth" onclick="setReportPeriod('month')">Месяц</button>
                 <button class="period-btn" id="btnPeriodWeek" onclick="setReportPeriod('week')">7 дней</button>
+                <button class="period-btn" id="btnPeriodToday" onclick="setReportPeriod('today')">Сегодня</button>
+                <button class="period-btn" id="btnPeriodYesterday" onclick="setReportPeriod('yesterday')">Вчера</button>
+                <button class="period-btn" id="btnPeriodCustom" onclick="setReportPeriod('custom')">Период 📅</button>
               </div>
             </div>
-            <p class="card-desc" id="reportPeriodDesc">Показатели за весь период ведения системы</p>
+
+            <!-- Custom Date Range Picker -->
+            <div class="custom-date-picker-bar hidden" id="customDateRangeBox">
+              <div class="date-input-wrap">
+                <span class="date-input-label">С:</span>
+                <input type="date" id="reportStartDate" onchange="onCustomDateRangeChanged()">
+              </div>
+              <div class="date-arrow">→</div>
+              <div class="date-input-wrap">
+                <span class="date-input-label">По:</span>
+                <input type="date" id="reportEndDate" onchange="onCustomDateRangeChanged()">
+              </div>
+            </div>
+
+            <p class="card-desc" id="reportPeriodDesc" style="margin-top: 8px;">Показатели за всё время ведения системы</p>
           </div>
 
           <!-- Big Stat Grid -->
@@ -580,6 +597,6 @@
 
   </div>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>
