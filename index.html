@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   
-  <link rel="stylesheet" href="style.css?v=13">
+  <link rel="stylesheet" href="style.css?v=14">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -137,6 +137,22 @@
           <button class="primary-btn complete-workout-big-btn" onclick="completeFullWorkoutToday()">
             🏁 Завершить всю тренировку дня!
           </button>
+
+          <!-- NEW: ТРЕНИРОВКА ЗА СЕГОДНЯ ПО РАСПИСАНИЮ: ПЛАН vs ФАКТ И РАЗНИЦА -->
+          <div class="section-card schedule-workout-card" id="scheduleWorkoutCard">
+            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 10px;">
+              <div>
+                <span class="section-title">⚡ Тренировка за сегодня по расписанию</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">
+                  План из блоков категории «Спорт». Укажи факт, чтобы узнать разницу:
+                </p>
+              </div>
+              <button class="add-slot-btn" onclick="switchView('viewSchedule')">В расписание 📋</button>
+            </div>
+            <div id="scheduleWorkoutComparisonList">
+              <!-- Rendered dynamically by JS -->
+            </div>
+          </div>
 
           <!-- Recent Workout History -->
           <div class="section-card history-card">
@@ -264,30 +280,16 @@
             </div>
           </div>
 
-          <!-- Report Section 1: Today's Workout Execution vs Plan -->
+          <!-- Report Section: Today's Schedule Workout Execution vs Plan -->
           <div class="section-card">
             <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 10px;">
               <div>
-                <span class="section-title">Тренировка на сегодня: План vs Факт</span>
-                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;" id="repTodaySubtitle">Суббота, 7 ноября</p>
+                <span class="section-title">🎯 Тренировка за сегодня по расписанию: План vs Факт</span>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;" id="repTodaySubtitle">План берется из блоков категории «Спорт»</p>
               </div>
               <button class="add-slot-btn" onclick="switchView('viewPushups')">К тренировке 💪</button>
             </div>
             <div id="todayWorkoutReportList">
-              <!-- Rendered by JS -->
-            </div>
-          </div>
-
-          <!-- Report Section 2: Weekly Workout Days Matrix -->
-          <div class="section-card">
-            <div class="schedule-actions-row" style="margin-top: 0; margin-bottom: 10px;">
-              <div>
-                <span class="section-title">График тренировок по дням недели</span>
-                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">В какой день недели какое упражнение запланировано</p>
-              </div>
-              <button class="add-slot-btn" onclick="openExerciseModal()">+ Упражнение</button>
-            </div>
-            <div class="week-split-grid" id="weekDaysScheduleMatrix">
               <!-- Rendered by JS -->
             </div>
           </div>
@@ -597,6 +599,6 @@
 
   </div>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
