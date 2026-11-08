@@ -2108,15 +2108,32 @@ function renderSchedule() {
 
   const viewDateObj = new Date(viewDateKey + 'T12:00:00');
   const viewDayOfWeek = viewDateObj.getDay(); // 0 = Вс, 1 = Пн, ...
+  const shortDayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const fullDayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  const weekdayShort = shortDayNames[viewDayOfWeek];
+  const weekdayFull = fullDayNames[viewDayOfWeek];
 
-  // Update nav label in UI
+  // Update nav label in UI (например, "Пн, 9 нояб.")
   const navLabelEl = document.getElementById('scheduleNavDateLabel');
   if (navLabelEl) {
     if (isViewingToday) {
-      navLabelEl.textContent = 'Сегодня';
+      navLabelEl.textContent = `Сегодня (${weekdayShort})`;
     } else {
       const dateOptions = { day: 'numeric', month: 'short' };
-      navLabelEl.textContent = viewDateObj.toLocaleDateString('ru-RU', dateOptions);
+      const dStr = viewDateObj.toLocaleDateString('ru-RU', dateOptions);
+      navLabelEl.textContent = `${weekdayShort}, ${dStr}`;
+    }
+  }
+
+  // Update hero title in UI (например, "План: Понедельник, 9 ноября")
+  const heroTitleEl = document.getElementById('scheduleHeroTitle');
+  if (heroTitleEl) {
+    if (isViewingToday) {
+      heroTitleEl.textContent = 'План на сегодня';
+    } else {
+      const dateOptions = { day: 'numeric', month: 'long' };
+      const dLongStr = viewDateObj.toLocaleDateString('ru-RU', dateOptions);
+      heroTitleEl.textContent = `План: ${weekdayFull}, ${dLongStr}`;
     }
   }
 
@@ -2168,13 +2185,19 @@ function renderSchedule() {
       const parts = (slot.specificDate || '').split('-');
       const startLabel = parts.length === 3 ? `${parseInt(parts[2], 10)}.${parts[1]}` : slot.specificDate;
       const dur = parseInt(slot.durationDays, 10) || 1;
+      let startDayPrefix = '';
+      if (slot.specificDate) {
+        const [y, m, d] = slot.specificDate.split('-').map(Number);
+        const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        startDayPrefix = dayNames[(new Date(y, m - 1, d)).getDay()] + ', ';
+      }
       if (dur > 1) {
         const endKey = getSlotEndDateKey(slot.specificDate, dur);
         const endParts = endKey.split('-');
         const endLabel = endParts.length === 3 ? `${parseInt(endParts[2], 10)}.${endParts[1]}` : endKey;
-        dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${startLabel}–${endLabel} (${dur} дн.)</span>`;
+        dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${startDayPrefix}${startLabel}–${endLabel} (${dur} дн.)</span>`;
       } else {
-        dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${startLabel}</span>`;
+        dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${startDayPrefix}${startLabel}</span>`;
       }
     } else if (slot.recurrenceType === 'weekdays' && Array.isArray(slot.daysOfWeek)) {
       const dayNames = { 1: 'Пн', 2: 'Вт', 3: 'Ср', 4: 'Чт', 5: 'Пт', 6: 'Сб', 0: 'Вс' };
@@ -2331,6 +2354,16 @@ function isDateInSlotRange(dateKey, startKey, durationDays) {
   return dateKey <= endKey;
 }
 
+function formatFullDateRu(dateKey) {
+  if (!dateKey) return '';
+  const parts = dateKey.split('-').map(Number);
+  if (parts.length !== 3) return dateKey;
+  const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+  const fullDayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  const months = ['янв.', 'февр.', 'марта', 'апр.', 'мая', 'июня', 'июля', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.'];
+  return `${fullDayNames[dt.getDay()]}, ${parts[2]} ${months[dt.getMonth()]}`;
+}
+
 function updateSlotDurationHint() {
   const dateInput = document.getElementById('slotSpecificDate');
   const durInput = document.getElementById('slotDurationDays');
@@ -2349,16 +2382,10 @@ function updateSlotDurationHint() {
   if (hint) {
     const startDateKey = (dateInput && dateInput.value) ? dateInput.value : getScheduleViewDateKey();
     if (days === 1) {
-      const parts = startDateKey.split('-');
-      const dLabel = parts.length === 3 ? `${parseInt(parts[2], 10)}.${parts[1]}` : startDateKey;
-      hint.innerHTML = `📅 Блок появится только на выбранную дату (<b>${dLabel}</b>, 1 день).`;
+      hint.innerHTML = `📅 Блок появится на выбранную дату: <b>${formatFullDateRu(startDateKey)}</b> (1 день).`;
     } else {
       const endKey = getSlotEndDateKey(startDateKey, days);
-      const sParts = startDateKey.split('-');
-      const eParts = endKey.split('-');
-      const sLabel = sParts.length === 3 ? `${parseInt(sParts[2], 10)}.${sParts[1]}` : startDateKey;
-      const eLabel = eParts.length === 3 ? `${parseInt(eParts[2], 10)}.${eParts[1]}` : endKey;
-      hint.innerHTML = `📅 Блок будет повторяться <b>${days} ${formatDaysRu(days)}</b> подряд: с <b>${sLabel}</b> по <b>${eLabel}</b> включительно.`;
+      hint.innerHTML = `📅 Блок будет повторяться <b>${days} ${formatDaysRu(days)}</b> подряд: с <b>${formatFullDateRu(startDateKey)}</b> по <b>${formatFullDateRu(endKey)}</b> включительно.`;
     }
   }
 }
