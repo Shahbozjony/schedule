@@ -2123,16 +2123,7 @@ function renderSchedule() {
   const allSlots = currentUser.scheduleSlots || [];
 
   // Filter slots for the viewed date
-  const slots = allSlots.filter(slot => {
-    if (!slot.recurrenceType || slot.recurrenceType === 'daily') return true;
-    if (slot.recurrenceType === 'today_only' || slot.recurrenceType === 'specific_date') {
-      return slot.specificDate === viewDateKey;
-    }
-    if (slot.recurrenceType === 'weekdays' && Array.isArray(slot.daysOfWeek)) {
-      return slot.daysOfWeek.includes(viewDayOfWeek);
-    }
-    return true;
-  });
+  const slots = allSlots.filter(slot => isSlotActiveOnDate(slot, viewDateKey, viewDayOfWeek));
 
   slots.sort((a, b) => a.start.localeCompare(b.start));
 
@@ -2167,11 +2158,24 @@ function renderSchedule() {
     // Day / Recurrence badge
     let dayBadgeHtml = '';
     if (slot.recurrenceType === 'today_only') {
-      dayBadgeHtml = `<span class="timeline-day-badge today">🎯 Только сегодня</span>`;
+      const dur = parseInt(slot.durationDays, 10) || 1;
+      if (dur > 1) {
+        dayBadgeHtml = `<span class="timeline-day-badge today">🎯 На ${dur} дн.</span>`;
+      } else {
+        dayBadgeHtml = `<span class="timeline-day-badge today">🎯 Только сегодня</span>`;
+      }
     } else if (slot.recurrenceType === 'specific_date') {
       const parts = (slot.specificDate || '').split('-');
-      const label = parts.length === 3 ? `${parseInt(parts[2], 10)}.${parts[1]}` : slot.specificDate;
-      dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${label}</span>`;
+      const startLabel = parts.length === 3 ? `${parseInt(parts[2], 10)}.${parts[1]}` : slot.specificDate;
+      const dur = parseInt(slot.durationDays, 10) || 1;
+      if (dur > 1) {
+        const endKey = getSlotEndDateKey(slot.specificDate, dur);
+        const endParts = endKey.split('-');
+        const endLabel = endParts.length === 3 ? `${parseInt(endParts[2], 10)}.${endParts[1]}` : endKey;
+        dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${startLabel}–${endLabel} (${dur} дн.)</span>`;
+      } else {
+        dayBadgeHtml = `<span class="timeline-day-badge specific">🗓️ ${startLabel}</span>`;
+      }
     } else if (slot.recurrenceType === 'weekdays' && Array.isArray(slot.daysOfWeek)) {
       const dayNames = { 1: 'Пн', 2: 'Вт', 3: 'Ср', 4: 'Чт', 5: 'Пт', 6: 'Сб', 0: 'Вс' };
       const label = slot.daysOfWeek.map(d => dayNames[d] || d).join(', ');
@@ -2287,6 +2291,7 @@ function toggleSlotCompletion(slotId) {
   } else {
     list.push(slotId);
     playHapticSound('success');
+    recordScheduleActivity('toggle_slot', viewDateKey);
   }
 
   saveCurrentUser();
@@ -2295,12 +2300,84 @@ function toggleSlotCompletion(slotId) {
   renderReport();
 }
 
+function formatDaysRu(num) {
+  const n = Math.abs(num) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) return 'дней';
+  if (n1 > 1 && n1 < 5) return 'дня';
+  if (n1 === 1) return 'день';
+  return 'дней';
+}
+
+function getSlotEndDateKey(startKey, durationDays) {
+  if (!startKey) return '';
+  const days = Math.max(1, parseInt(durationDays, 10) || 1);
+  if (days <= 1) return startKey;
+  const parts = startKey.split('-').map(Number);
+  const sDate = new Date(parts[0], parts[1] - 1, parts[2]);
+  sDate.setDate(sDate.getDate() + (days - 1));
+  const y = sDate.getFullYear();
+  const m = String(sDate.getMonth() + 1).padStart(2, '0');
+  const d = String(sDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function isDateInSlotRange(dateKey, startKey, durationDays) {
+  if (!startKey || !dateKey) return false;
+  const days = Math.max(1, parseInt(durationDays, 10) || 1);
+  if (days <= 1) return dateKey === startKey;
+  if (dateKey < startKey) return false;
+  const endKey = getSlotEndDateKey(startKey, days);
+  return dateKey <= endKey;
+}
+
+function updateSlotDurationHint() {
+  const dateInput = document.getElementById('slotSpecificDate');
+  const durInput = document.getElementById('slotDurationDays');
+  const display = document.getElementById('slotDurationDaysDisplay');
+  const hint = document.getElementById('slotDurationHint');
+  if (!durInput) return;
+
+  let days = parseInt(durInput.value, 10);
+  if (isNaN(days) || days < 1) days = 1;
+  if (days > 365) days = 365;
+
+  if (display) {
+    display.textContent = `${days} ${formatDaysRu(days)}`;
+  }
+
+  if (hint) {
+    const startDateKey = (dateInput && dateInput.value) ? dateInput.value : getScheduleViewDateKey();
+    if (days === 1) {
+      const parts = startDateKey.split('-');
+      const dLabel = parts.length === 3 ? `${parseInt(parts[2], 10)}.${parts[1]}` : startDateKey;
+      hint.innerHTML = `📅 Блок появится только на выбранную дату (<b>${dLabel}</b>, 1 день).`;
+    } else {
+      const endKey = getSlotEndDateKey(startDateKey, days);
+      const sParts = startDateKey.split('-');
+      const eParts = endKey.split('-');
+      const sLabel = sParts.length === 3 ? `${parseInt(sParts[2], 10)}.${sParts[1]}` : startDateKey;
+      const eLabel = eParts.length === 3 ? `${parseInt(eParts[2], 10)}.${eParts[1]}` : endKey;
+      hint.innerHTML = `📅 Блок будет повторяться <b>${days} ${formatDaysRu(days)}</b> подряд: с <b>${sLabel}</b> по <b>${eLabel}</b> включительно.`;
+    }
+  }
+}
+
+function setSlotDurationPreset(days) {
+  const durInput = document.getElementById('slotDurationDays');
+  if (durInput) {
+    durInput.value = days;
+    updateSlotDurationHint();
+  }
+}
+
 function onSlotRecurrenceTypeChange(selectEl) {
   const val = selectEl.value;
   const dateGroup = document.getElementById('slotSpecificDateGroup');
   const weekdaysGroup = document.getElementById('slotWeekdaysGroup');
   if (dateGroup) dateGroup.classList.toggle('hidden', val !== 'specific_date');
   if (weekdaysGroup) weekdaysGroup.classList.toggle('hidden', val !== 'weekdays');
+  updateSlotDurationHint();
 }
 
 // Modal: Add / Edit Block with Exercises and Configurable Penalty
@@ -2326,6 +2403,10 @@ function openAddSlotModal() {
   }
   const dateInput = document.getElementById('slotSpecificDate');
   if (dateInput) dateInput.value = viewDateKey;
+
+  const durInput = document.getElementById('slotDurationDays');
+  if (durInput) durInput.value = 1;
+  updateSlotDurationHint();
 
   document.querySelectorAll('input[name="slotWeekday"]').forEach(cb => { cb.checked = false; });
 
@@ -2361,6 +2442,12 @@ function openEditSlotModal(slotId) {
   if (dateInput) {
     dateInput.value = slot.specificDate || getScheduleViewDateKey();
   }
+  const durInput = document.getElementById('slotDurationDays');
+  if (durInput) {
+    durInput.value = slot.durationDays || 1;
+  }
+  updateSlotDurationHint();
+
   const daysOfWeek = slot.daysOfWeek || [];
   document.querySelectorAll('input[name="slotWeekday"]').forEach(cb => {
     cb.checked = daysOfWeek.includes(parseInt(cb.value, 10));
@@ -2631,6 +2718,9 @@ function saveScheduleSlot(e) {
     specificDate = (dInp && dInp.value) ? dInp.value : getScheduleViewDateKey();
   }
 
+  const durInput = document.getElementById('slotDurationDays');
+  const durationDays = durInput ? Math.max(1, Math.min(365, parseInt(durInput.value, 10) || 1)) : 1;
+
   const daysOfWeek = [];
   if (recurrenceType === 'weekdays') {
     document.querySelectorAll('input[name="slotWeekday"]:checked').forEach(cb => {
@@ -2663,6 +2753,7 @@ function saveScheduleSlot(e) {
       slot.exercises = exercises;
       slot.recurrenceType = recurrenceType;
       slot.specificDate = specificDate;
+      slot.durationDays = (recurrenceType === 'specific_date' || recurrenceType === 'today_only') ? durationDays : 1;
       slot.daysOfWeek = daysOfWeek;
     }
   } else {
@@ -2676,11 +2767,13 @@ function saveScheduleSlot(e) {
       exercises,
       recurrenceType,
       specificDate,
+      durationDays: (recurrenceType === 'specific_date' || recurrenceType === 'today_only') ? durationDays : 1,
       daysOfWeek
     });
   }
 
   saveCurrentUser();
+  recordScheduleActivity(slotId ? 'edit_slot' : 'add_slot', specificDate || getScheduleViewDateKey());
   closeSlotModal();
   renderSchedule();
   renderPenalties();
@@ -2694,6 +2787,7 @@ function deleteCurrentSlot() {
   if (confirm('Удалить этот блок из расписания?')) {
     currentUser.scheduleSlots = currentUser.scheduleSlots.filter(s => s.id !== slotId);
     saveCurrentUser();
+    recordScheduleActivity('delete_slot', getScheduleViewDateKey());
     closeSlotModal();
     renderSchedule();
     renderPenalties();
@@ -3838,13 +3932,79 @@ function renderReport() {
 function isSlotActiveOnDate(slot, dateKey, dayOfWeek) {
   if (!slot) return false;
   if (!slot.recurrenceType || slot.recurrenceType === 'daily') return true;
-  if (slot.recurrenceType === 'today_only' || slot.recurrenceType === 'specific_date') {
-    return slot.specificDate === dateKey;
+  if (slot.recurrenceType === 'today_only') {
+    return isDateInSlotRange(dateKey, slot.specificDate || getTodayDateKey(), slot.durationDays || 1);
+  }
+  if (slot.recurrenceType === 'specific_date') {
+    return isDateInSlotRange(dateKey, slot.specificDate, slot.durationDays || 1);
   }
   if (slot.recurrenceType === 'weekdays' && Array.isArray(slot.daysOfWeek)) {
-    return slot.daysOfWeek.includes(dayOfWeek);
+    const dow = (dayOfWeek !== undefined) ? dayOfWeek : (new Date(dateKey + 'T12:00:00')).getDay();
+    return slot.daysOfWeek.includes(dow);
   }
   return true;
+}
+
+function recordScheduleActivity(actionType, targetDateKey) {
+  if (!currentUser) return;
+  if (!currentUser.scheduleActivityLog) currentUser.scheduleActivityLog = {};
+
+  const todayKey = getTodayDateKey();
+  if (!currentUser.scheduleActivityLog[todayKey]) {
+    currentUser.scheduleActivityLog[todayKey] = {
+      editsCount: 0,
+      plannedNextDay: false,
+      lastUpdated: Date.now()
+    };
+  }
+  const log = currentUser.scheduleActivityLog[todayKey];
+  log.editsCount = (log.editsCount || 0) + 1;
+  log.lastUpdated = Date.now();
+
+  // Check if targetDateKey is tomorrow or later
+  const [y, m, d] = todayKey.split('-').map(Number);
+  const nextDate = new Date(y, m - 1, d + 1);
+  const tomorrowKey = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+
+  if (targetDateKey && (targetDateKey === tomorrowKey || targetDateKey > todayKey)) {
+    log.plannedNextDay = true;
+  }
+
+  saveCurrentUser();
+  checkAutomaticAchievements();
+}
+
+function getSchedulePlanningStreak(user) {
+  if (!user || !user.scheduleActivityLog) return 0;
+  const log = user.scheduleActivityLog;
+  const todayKey = getTodayDateKey();
+
+  const isDayQualified = (dateKey) => {
+    const entry = log[dateKey];
+    if (!entry) return false;
+    return ((entry.editsCount || 0) >= 3) || (entry.plannedNextDay === true);
+  };
+
+  let streak = 0;
+  const [tY, tM, tD] = todayKey.split('-').map(Number);
+  let checkDate = new Date(tY, tM - 1, tD);
+
+  const todayQualified = isDayQualified(todayKey);
+  if (!todayQualified) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  while (true) {
+    const key = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+    if (isDayQualified(key)) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
 }
 
 function getScheduleSportExercises() {
@@ -5553,7 +5713,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первая глава',
     desc: 'Прочитать первые 15 страниц в трекере книг',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'reading',
     metric: 'pages',
     target: 15,
@@ -5565,7 +5725,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Вкус к чтению',
     desc: 'Прочитать 50 страниц полезной литературы',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'reading',
     metric: 'pages',
     target: 50,
@@ -5577,7 +5737,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Сотня страниц',
     desc: 'Прочитать суммарно 100 страниц',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'reading',
     metric: 'pages',
     target: 100,
@@ -5589,7 +5749,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Глубокое погружение',
     desc: 'Прочитать 250 страниц вдумчивого текста',
     tier: 'silver',
-    coinsAward: 20,
+    coinsAward: 75,
     category: 'reading',
     metric: 'pages',
     target: 250,
@@ -5601,7 +5761,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Эрудит',
     desc: 'Преодолеть рубеж в 500 прочитанных страниц',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 80,
     category: 'reading',
     metric: 'pages',
     target: 500,
@@ -5613,7 +5773,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Книжный червь',
     desc: 'Прочитать суммарно 1 000 страниц',
     tier: 'silver',
-    coinsAward: 30,
+    coinsAward: 100,
     category: 'reading',
     metric: 'pages',
     target: 1000,
@@ -5625,7 +5785,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Знаток и мыслитель',
     desc: 'Осилить 2 500 страниц книг по саморазвитию и науке',
     tier: 'gold',
-    coinsAward: 45,
+    coinsAward: 150,
     category: 'reading',
     metric: 'pages',
     target: 2500,
@@ -5637,7 +5797,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Библиотекарь',
     desc: 'Прочитать 5 000 страниц ценной литературы',
     tier: 'platinum',
-    coinsAward: 80,
+    coinsAward: 300,
     category: 'reading',
     metric: 'pages',
     target: 5000,
@@ -5649,7 +5809,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Книжный дебют',
     desc: 'Полностью прочитать 1-ю книгу от корки до корки',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'reading',
     metric: 'books',
     target: 1,
@@ -5661,7 +5821,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Двойной залп',
     desc: 'Закончить чтение 2 книг',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'reading',
     metric: 'books',
     target: 2,
@@ -5673,7 +5833,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Постоянный читатель',
     desc: 'Полностью прочитать 5 книг',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 80,
     category: 'reading',
     metric: 'books',
     target: 5,
@@ -5685,7 +5845,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Книжная полка',
     desc: 'Полностью прочитать 10 книг',
     tier: 'gold',
-    coinsAward: 40,
+    coinsAward: 150,
     category: 'reading',
     metric: 'books',
     target: 10,
@@ -5697,7 +5857,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Домашняя библиотека',
     desc: 'Прочитать 25 книг',
     tier: 'platinum',
-    coinsAward: 75,
+    coinsAward: 300,
     category: 'reading',
     metric: 'books',
     target: 25,
@@ -5711,7 +5871,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первые шаги в науке',
     desc: 'Разобрать первые 10 учебных задач или разделов',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'study',
     metric: 'study_tasks',
     target: 10,
@@ -5723,7 +5883,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Упорный студент',
     desc: 'Решить 25 задач по профильным предметам',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'study',
     metric: 'study_tasks',
     target: 25,
@@ -5735,7 +5895,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Студент ACCA',
     desc: 'Разобрать 50 задач или учебных тем',
     tier: 'bronze',
-    coinsAward: 20,
+    coinsAward: 50,
     category: 'study',
     metric: 'study_tasks',
     target: 50,
@@ -5747,7 +5907,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Финансовый аналитик',
     desc: 'Решить 100 задач из программы подготовки',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 75,
     category: 'study',
     metric: 'study_tasks',
     target: 100,
@@ -5759,7 +5919,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Мастер отчётности',
     desc: 'Решить 250 практических задач',
     tier: 'silver',
-    coinsAward: 35,
+    coinsAward: 100,
     category: 'study',
     metric: 'study_tasks',
     target: 250,
@@ -5771,7 +5931,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Экзаменационный штурм',
     desc: 'Решить 500 задач из Exam Kit (BPP / Kaplan)',
     tier: 'gold',
-    coinsAward: 50,
+    coinsAward: 150,
     category: 'study',
     metric: 'study_tasks',
     target: 500,
@@ -5783,7 +5943,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Фокус внимания',
     desc: 'Провести 1 учебную сессию глубокой концентрации',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'study',
     metric: 'study_sessions',
     target: 1,
@@ -5795,7 +5955,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'В потоке',
     desc: 'Успешно завершить 5 учебных сессий',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'study',
     metric: 'study_sessions',
     target: 5,
@@ -5807,7 +5967,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Мастер концентрации',
     desc: 'Провести 20 учебных сессий по расписанию',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 80,
     category: 'study',
     metric: 'study_sessions',
     target: 20,
@@ -5819,7 +5979,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Глубокая работа',
     desc: 'Завершить 50 продуктивных учебных сессий',
     tier: 'gold',
-    coinsAward: 40,
+    coinsAward: 150,
     category: 'study',
     metric: 'study_sessions',
     target: 50,
@@ -5831,7 +5991,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Профессор тайм-менеджмента',
     desc: 'Провести 100 сессий по расписанию',
     tier: 'platinum',
-    coinsAward: 75,
+    coinsAward: 300,
     category: 'study',
     metric: 'study_sessions',
     target: 100,
@@ -5843,7 +6003,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Член ассоциации (ACCA Master)',
     desc: 'Завершить всю программу подготовки к экзамену ACCA',
     tier: 'platinum',
-    coinsAward: 100,
+    coinsAward: 400,
     category: 'study',
     metric: 'study_master',
     target: 1,
@@ -5857,7 +6017,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Разминка',
     desc: 'Сделать первые 25 повторений упражнений',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'sport',
     metric: 'reps',
     target: 25,
@@ -5869,7 +6029,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Втягивание в ритм',
     desc: 'Сделать 50 повторений в зачет тренировок',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'sport',
     metric: 'reps',
     target: 50,
@@ -5881,7 +6041,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первая кровь',
     desc: 'Сделать первые 100 чистых повторений',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'sport',
     metric: 'reps',
     target: 100,
@@ -5893,7 +6053,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Стальной импульс',
     desc: 'Сделать 250 повторений в сумме',
     tier: 'bronze',
-    coinsAward: 20,
+    coinsAward: 50,
     category: 'sport',
     metric: 'reps',
     target: 250,
@@ -5905,7 +6065,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Неутомимый',
     desc: 'Выполнить 500 повторений упражнений',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 75,
     category: 'sport',
     metric: 'reps',
     target: 500,
@@ -5917,7 +6077,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Железная тысяча',
     desc: 'Преодолеть рубеж в 1 000 повторений',
     tier: 'silver',
-    coinsAward: 30,
+    coinsAward: 100,
     category: 'sport',
     metric: 'reps',
     target: 1000,
@@ -5929,7 +6089,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Гладиатор',
     desc: 'Выполнить 2 500 повторений',
     tier: 'gold',
-    coinsAward: 45,
+    coinsAward: 150,
     category: 'sport',
     metric: 'reps',
     target: 2500,
@@ -5941,7 +6101,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Спартанец',
     desc: 'Сделать 5 000 чистых повторений',
     tier: 'gold',
-    coinsAward: 60,
+    coinsAward: 200,
     category: 'sport',
     metric: 'reps',
     target: 5000,
@@ -5953,7 +6113,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Титановый атлет',
     desc: 'Сделать 10 000 чистых повторений (машина дисциплины)',
     tier: 'platinum',
-    coinsAward: 100,
+    coinsAward: 400,
     category: 'sport',
     metric: 'reps',
     target: 10000,
@@ -5965,7 +6125,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Железный кор',
     desc: 'Простоять суммарно 60 секунд в планке',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'sport',
     metric: 'plank_seconds',
     target: 60,
@@ -5977,7 +6137,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Гравитация повержена',
     desc: 'Простоять 300 секунд (5 минут) в планке',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 80,
     category: 'sport',
     metric: 'plank_seconds',
     target: 300,
@@ -5989,7 +6149,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Скала',
     desc: 'Простоять 1 200 секунд (20 минут) суммарно в планке',
     tier: 'gold',
-    coinsAward: 45,
+    coinsAward: 150,
     category: 'sport',
     metric: 'plank_seconds',
     target: 1200,
@@ -6003,7 +6163,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первый шаг дня',
     desc: 'Закрыть свой первый блок расписания',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'discipline',
     metric: 'schedule_slots_done',
     target: 1,
@@ -6015,7 +6175,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'В ритме дня',
     desc: 'Выполнить 10 блоков расписания',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'discipline',
     metric: 'schedule_slots_done',
     target: 10,
@@ -6027,7 +6187,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'По часам',
     desc: 'Выполнить 30 запланированных блоков',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 75,
     category: 'discipline',
     metric: 'schedule_slots_done',
     target: 30,
@@ -6039,7 +6199,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Абсолютный тайминг',
     desc: 'Выполнить 100 блоков расписания',
     tier: 'gold',
-    coinsAward: 40,
+    coinsAward: 150,
     category: 'discipline',
     metric: 'schedule_slots_done',
     target: 100,
@@ -6051,7 +6211,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Чистый лист',
     desc: 'Закрыть 1 день по расписанию без единого штрафа',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'discipline',
     metric: 'clean_days',
     target: 1,
@@ -6063,7 +6223,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Уверенный старт',
     desc: '3 чистых дня без штрафов',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'discipline',
     metric: 'clean_days',
     target: 3,
@@ -6075,7 +6235,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Неделя чистоты',
     desc: '7 дней соблюдения режима и 0 сум штрафов',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 80,
     category: 'discipline',
     metric: 'clean_days',
     target: 7,
@@ -6087,7 +6247,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Две недели контроля',
     desc: '14 чистых дней без пропусков',
     tier: 'silver',
-    coinsAward: 30,
+    coinsAward: 100,
     category: 'discipline',
     metric: 'clean_days',
     target: 14,
@@ -6099,7 +6259,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Месяц безупречности',
     desc: '30 дней дисциплины без единого срыва',
     tier: 'gold',
-    coinsAward: 50,
+    coinsAward: 200,
     category: 'discipline',
     metric: 'clean_days',
     target: 30,
@@ -6111,7 +6271,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Огонь внутри',
     desc: 'Удержать 3 дня непрерывного стрика',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'discipline',
     metric: 'streak',
     target: 3,
@@ -6123,7 +6283,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Неделя без пощады',
     desc: 'Удержать 7 дней дисциплинарного стрика',
     tier: 'silver',
-    coinsAward: 20,
+    coinsAward: 75,
     category: 'discipline',
     metric: 'streak',
     target: 7,
@@ -6135,7 +6295,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Неудержимый',
     desc: '14 дней непрерывной серии побед над собой',
     tier: 'silver',
-    coinsAward: 30,
+    coinsAward: 100,
     category: 'discipline',
     metric: 'streak',
     target: 14,
@@ -6147,7 +6307,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Месяц стали',
     desc: '30 дней непрерывного соблюдения расписания',
     tier: 'gold',
-    coinsAward: 45,
+    coinsAward: 200,
     category: 'discipline',
     metric: 'streak',
     target: 30,
@@ -6159,10 +6319,59 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Властелин времени',
     desc: '100 дней железной дисциплины и 0 сум штрафов',
     tier: 'platinum',
-    coinsAward: 100,
+    coinsAward: 500,
     category: 'discipline',
     metric: 'streak',
     target: 100,
+    unlockedBy: []
+  },
+  // --- ПЛАНИРОВАНИЕ И ОБНОВЛЕНИЕ РАСПИСАНИЯ ПОДРЯД ---
+  {
+    id: 'ach_plan_streak_3',
+    icon: '📝',
+    title: 'Архитектор дня',
+    desc: '3 дня подряд вносить минимум 3 изменения в расписание или планировать следующий день',
+    tier: 'bronze',
+    coinsAward: 50,
+    category: 'discipline',
+    metric: 'schedule_planning_streak',
+    target: 3,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_plan_streak_7',
+    icon: '📆',
+    title: 'Стратег недели',
+    desc: '7 дней подряд активно вести расписание (3+ правки в день или планирование на завтра)',
+    tier: 'silver',
+    coinsAward: 100,
+    category: 'discipline',
+    metric: 'schedule_planning_streak',
+    target: 7,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_plan_streak_14',
+    icon: '🧭',
+    title: 'Штурман времени',
+    desc: '14 дней подряд непрерывно планировать свой график и следующий день',
+    tier: 'gold',
+    coinsAward: 200,
+    category: 'discipline',
+    metric: 'schedule_planning_streak',
+    target: 14,
+    unlockedBy: []
+  },
+  {
+    id: 'ach_plan_streak_30',
+    icon: '👑',
+    title: 'Гроссмейстер планирования',
+    desc: '30 дней подряд держать расписание в идеальном тонусе и готовить каждый день заранее',
+    tier: 'platinum',
+    coinsAward: 400,
+    category: 'discipline',
+    metric: 'schedule_planning_streak',
+    target: 30,
     unlockedBy: []
   },
 
@@ -6173,7 +6382,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первое рукопожатие',
     desc: 'Добавить своего первого друга в системе',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'social',
     metric: 'friends',
     target: 1,
@@ -6185,7 +6394,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Команда дисциплины',
     desc: 'Собрать в друзьях 3 атлетов',
     tier: 'silver',
-    coinsAward: 20,
+    coinsAward: 80,
     category: 'social',
     metric: 'friends',
     target: 3,
@@ -6197,7 +6406,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Круг доверия',
     desc: 'Иметь 5 подтвержденных друзей в профиле',
     tier: 'gold',
-    coinsAward: 35,
+    coinsAward: 150,
     category: 'social',
     metric: 'friends',
     target: 5,
@@ -6209,7 +6418,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Лидер комьюнити',
     desc: 'Собрать 10 друзей и единомышленников',
     tier: 'platinum',
-    coinsAward: 75,
+    coinsAward: 300,
     category: 'social',
     metric: 'friends',
     target: 10,
@@ -6223,7 +6432,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Индивидуальность',
     desc: 'Установить кастомную аватарку (фото, эмодзи или арт)',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'shop',
     metric: 'avatar_custom',
     target: 1,
@@ -6235,7 +6444,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Агент под прикрытием',
     desc: 'Активировать режим приватности (Инкогнито)',
     tier: 'bronze',
-    coinsAward: 10,
+    coinsAward: 50,
     category: 'shop',
     metric: 'incognito',
     target: 1,
@@ -6247,7 +6456,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первый капитал',
     desc: 'Накопить на балансе 250 Coins',
     tier: 'bronze',
-    coinsAward: 15,
+    coinsAward: 50,
     category: 'shop',
     metric: 'coins_earned',
     target: 250,
@@ -6259,7 +6468,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Золотой запас',
     desc: 'Накопить 500 Coins на счету',
     tier: 'silver',
-    coinsAward: 25,
+    coinsAward: 80,
     category: 'shop',
     metric: 'coins_earned',
     target: 500,
@@ -6271,7 +6480,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Дисциплинарный магнат',
     desc: 'Накопить 2 000 Coins',
     tier: 'gold',
-    coinsAward: 50,
+    coinsAward: 150,
     category: 'shop',
     metric: 'coins_earned',
     target: 2000,
@@ -6283,7 +6492,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Первая покупка',
     desc: 'Купить свой первый предмет в магазине наград',
     tier: 'silver',
-    coinsAward: 20,
+    coinsAward: 75,
     category: 'shop',
     metric: 'inventory',
     target: 1,
@@ -6295,7 +6504,7 @@ const DEFAULT_ACHIEVEMENTS = [
     title: 'Коллекционер стиля',
     desc: 'Приобрести 3 эксклюзивных предмета в магазине',
     tier: 'gold',
-    coinsAward: 40,
+    coinsAward: 150,
     category: 'shop',
     metric: 'inventory',
     target: 3,
@@ -6457,6 +6666,7 @@ function checkAutomaticAchievements() {
   }
 
   const streak = (todayKey >= baseDate ? (currentUser.streak || currentUser.studyStreak || 0) : 0);
+  const planningStreak = (todayKey >= baseDate ? getSchedulePlanningStreak(currentUser) : 0);
   const friendsCount = (currentUser.friends || []).length;
   const totalCoins = currentUser.coins || 0;
   const inventoryCount = (currentUser.inventory || []).length;
@@ -6480,6 +6690,7 @@ function checkAutomaticAchievements() {
       if (ach.metric === 'schedule_slots_done' && totalSlotsDone >= ach.target) meetsCondition = true;
       if (ach.metric === 'clean_days' && cleanDays >= ach.target) meetsCondition = true;
       if (ach.metric === 'streak' && streak >= ach.target) meetsCondition = true;
+      if (ach.metric === 'schedule_planning_streak' && planningStreak >= ach.target) meetsCondition = true;
       if (ach.metric === 'friends' && friendsCount >= ach.target) meetsCondition = true;
       if (ach.metric === 'avatar_custom' && hasCustomAvatar >= ach.target) meetsCondition = true;
       if (ach.metric === 'incognito' && isIncognito >= ach.target) meetsCondition = true;
@@ -6491,7 +6702,7 @@ function checkAutomaticAchievements() {
         updated = true;
 
         // Award Coins for opening achievement
-        const coinsAward = ach.coinsAward || (ach.tier === 'platinum' ? 100 : ach.tier === 'gold' ? 50 : ach.tier === 'silver' ? 25 : 10);
+        const coinsAward = ach.coinsAward || (ach.tier === 'platinum' ? 300 : ach.tier === 'gold' ? 150 : ach.tier === 'silver' ? 75 : 50);
         if (!currentUser.unlockedAchievementsHistory) currentUser.unlockedAchievementsHistory = [];
         if (!currentUser.unlockedAchievementsHistory.includes(ach.id)) {
           currentUser.unlockedAchievementsHistory.push(ach.id);
@@ -6680,6 +6891,7 @@ function renderAchievements() {
   }
 
   const streak = isPastBase ? (currentUser.streak || currentUser.studyStreak || 0) : 0;
+  const planningStreak = isPastBase ? getSchedulePlanningStreak(currentUser) : 0;
   const friendsCount = (currentUser.friends || []).length;
   const totalCoins = currentUser.coins || 0;
   const inventoryCount = (currentUser.inventory || []).length;
@@ -6708,6 +6920,7 @@ function renderAchievements() {
     else if (ach.metric === 'schedule_slots_done') { curVal = totalSlotsDone; unitLabel = 'блоков'; }
     else if (ach.metric === 'clean_days') { curVal = cleanDays; unitLabel = 'дн.'; }
     else if (ach.metric === 'streak') { curVal = streak; unitLabel = 'дн.'; }
+    else if (ach.metric === 'schedule_planning_streak') { curVal = planningStreak; unitLabel = 'дн. подряд'; }
     else if (ach.metric === 'friends') { curVal = friendsCount; unitLabel = 'друзей'; }
     else if (ach.metric === 'avatar_custom') { curVal = hasCustomAvatar; unitLabel = 'выполнено'; }
     else if (ach.metric === 'incognito') { curVal = isIncognito; unitLabel = 'выполнено'; }
