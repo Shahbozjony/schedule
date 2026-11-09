@@ -528,6 +528,7 @@ function ensureUserDefaults() {
 
 function saveCurrentUser() {
   if (!currentUser) return;
+  currentUser.updatedAt = Date.now();
   try {
     localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
     const users = getAllUsers();
@@ -633,7 +634,7 @@ function togglePasswordVisibility(inputId, btnEl) {
   }
 }
 
-function handleLoginSubmit(e) {
+async function handleLoginSubmit(e) {
   e.preventDefault();
   const usernameInput = (document.getElementById('loginUsername').value || '').trim().toLowerCase();
   const passwordInput = (document.getElementById('loginPassword').value || '').trim();
@@ -650,7 +651,23 @@ function handleLoginSubmit(e) {
   const users = getAllUsers();
   let user = users[usernameInput];
 
-  // Fallback for primary user shahbozjony
+  // If not found locally, check the cloud database automatically
+  if (!user && window.CloudSync) {
+    if (errEl) {
+      errEl.textContent = '🔄 Подключение к облаку и проверка аккаунта...';
+      errEl.classList.remove('hidden');
+    }
+    try {
+      const remoteUser = await CloudSync.fetchUserDirect(usernameInput);
+      if (remoteUser && remoteUser.username) {
+        user = remoteUser;
+        users[usernameInput] = user;
+        saveAllUsers(users);
+      }
+    } catch (err) {}
+  }
+
+  // Fallback for primary user shahbozjony if database was completely empty
   if (!user && usernameInput === 'shahbozjony') {
     user = currentUser || createDefaultUserProfile('Шахбоз', 'shahbozjony', 'Schedule2004');
     users['shahbozjony'] = user;
@@ -687,7 +704,7 @@ function handleLoginSubmit(e) {
   }
 }
 
-function handleRegisterSubmit(e) {
+async function handleRegisterSubmit(e) {
   e.preventDefault();
   const name = (document.getElementById('regName').value || '').trim();
   const username = (document.getElementById('regUsername').value || '').trim().toLowerCase();
@@ -720,7 +737,19 @@ function handleRegisterSubmit(e) {
     return;
   }
 
+  if (window.CloudSync) {
+    const remoteCheck = await CloudSync.fetchUserDirect(username);
+    if (remoteCheck && remoteCheck.username) {
+      if (errEl) {
+        errEl.textContent = 'Этот логин уже зарегистрирован в облаке! Выберите другой логин или войдите.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+  }
+
   const newUser = createDefaultUserProfile(name, username, pass);
+  newUser.updatedAt = Date.now();
   users[username] = newUser;
   saveAllUsers(users);
 
@@ -729,6 +758,10 @@ function handleRegisterSubmit(e) {
   localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
   if (errEl) errEl.classList.add('hidden');
   showMainScreen();
+
+  if (window.CloudSync) {
+    CloudSync.push();
+  }
 }
 
 function handleProfileSecuritySave(e) {
@@ -863,6 +896,9 @@ function switchView(viewId) {
     renderAchievements();
     renderShop();
     renderLeaderboard();
+    if (window.CloudSync) {
+      CloudSync.syncAllUsers();
+    }
   }
   if (viewId === 'viewReport') {
     renderReport();
@@ -8536,13 +8572,17 @@ function checkUrlSyncParams() {
    CLOUD SYNC ENGINE (FIREBASE RTDB / REST KV)
    ========================================================= */
 
+const DEFAULT_CLOUD_DB_URL = 'https://discipline-by-shahboz-default-rtdb.firebaseio.com';
+
 const CloudSync = {
   getDbUrl() {
-    return (localStorage.getItem('discipline_cloud_db_url') || '').trim().replace(/\/+$/, '');
+    const custom = localStorage.getItem('discipline_cloud_db_url');
+    if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
+    return DEFAULT_CLOUD_DB_URL;
   },
 
   setDbUrl(url) {
-    if (url) localStorage.setItem('discipline_cloud_db_url', url.trim().replace(/\/+$/, ''));
+    if (url && url.trim()) localStorage.setItem('discipline_cloud_db_url', url.trim().replace(/\/+$/, ''));
     else localStorage.removeItem('discipline_cloud_db_url');
   },
 
@@ -8575,7 +8615,7 @@ const CloudSync = {
     if (this._syncTimeout) clearTimeout(this._syncTimeout);
     this._syncTimeout = setTimeout(() => {
       this.push();
-    }, 1500);
+    }, 1200);
   },
 
   async push() {
@@ -8589,8 +8629,10 @@ const CloudSync = {
         endpoint = `${dbUrl}/users/${encodeURIComponent(currentUser.username.toLowerCase())}.json`;
       }
 
+      if (!currentUser.updatedAt) currentUser.updatedAt = Date.now();
+
       const payload = {
-        updatedAt: Date.now(),
+        updatedAt: currentUser.updatedAt,
         user: currentUser
       };
 
@@ -8639,6 +8681,7 @@ const CloudSync = {
       const cloudData = await res.json();
 
       if (!cloudData) {
+        // Cloud has no data yet, push local if we have it
         if (currentUser) {
           await this.push();
         }
@@ -8648,7 +8691,17 @@ const CloudSync = {
       const remoteUser = cloudData.user || cloudData;
       if (!remoteUser || !remoteUser.username) return false;
 
-      // Update local storage and current user
+      // Smart conflict handling: compare timestamps
+      const localUpdated = (currentUser && currentUser.updatedAt) || 0;
+      const remoteUpdated = cloudData.updatedAt || remoteUser.updatedAt || 0;
+
+      if (localUpdated && remoteUpdated && localUpdated > remoteUpdated) {
+        // Local is newer! Push local to cloud
+        await this.push();
+        return true;
+      }
+
+      // Remote is newer or initial: update local storage and current user
       const users = getAllUsers();
       users[remoteUser.username.toLowerCase()] = remoteUser;
       saveAllUsers(users);
@@ -8676,13 +8729,60 @@ const CloudSync = {
     }
   },
 
-  async syncNow() {
+  async fetchUserDirect(username) {
     const dbUrl = this.getDbUrl();
-    if (!dbUrl) {
-      alert('Облачная база ещё не настроена.\n\nНажмите «⚙️ Настройки базы» и вставьте ссылку на бесплатную базу Firebase Realtime Database (или воспользуйтесь кнопкой «Скопировать код» выше для мгновенного переноса на ноутбук).');
-      return;
+    if (!dbUrl || !username) return null;
+    try {
+      let endpoint = dbUrl;
+      if (!endpoint.endsWith('.json')) {
+        endpoint = `${dbUrl}/users/${encodeURIComponent(username.toLowerCase())}.json`;
+      }
+      const res = await fetch(endpoint, { cache: 'no-cache' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data) return null;
+      return data.user || data;
+    } catch(e) {
+      console.warn('fetchUserDirect failed:', e);
+      return null;
     }
+  },
 
+  async syncAllUsers() {
+    const dbUrl = this.getDbUrl();
+    if (!dbUrl) return;
+    try {
+      let endpoint = `${dbUrl}/users.json`;
+      const res = await fetch(endpoint, { cache: 'no-cache' });
+      if (!res.ok) return;
+      const cloudUsers = await res.json();
+      if (cloudUsers && typeof cloudUsers === 'object') {
+        const users = getAllUsers();
+        let changed = false;
+        Object.keys(cloudUsers).forEach(uKey => {
+          const uData = cloudUsers[uKey];
+          const uObj = (uData && (uData.user || uData)) || null;
+          if (uObj && uObj.username) {
+            const localU = users[uKey.toLowerCase()];
+            if (!localU || (uData.updatedAt && localU.updatedAt && uData.updatedAt > localU.updatedAt)) {
+              users[uKey.toLowerCase()] = uObj;
+              changed = true;
+            }
+          }
+        });
+        if (changed) {
+          saveAllUsers(users);
+          if (document.getElementById('leaderboardTableBody')) {
+            renderLeaderboard();
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('syncAllUsers failed:', e);
+    }
+  },
+
+  async syncNow() {
     this.setStatus('syncing', 'Синхронизация...');
     showSyncToast('🔄 Обмен данными с облаком...');
 
@@ -8696,7 +8796,7 @@ const CloudSync = {
       if (pushSuccess) {
         showSyncToast('🟢 Данные выгружены в облако!');
       } else {
-        showSyncToast('⚠️ Ошибка соединения с облаком. Проверьте интернет и адрес базы.');
+        showSyncToast('⚠️ Ошибка соединения с облаком. Проверьте интернет.');
       }
     }
   },
@@ -8720,13 +8820,13 @@ const CloudSync = {
     const timeEl = document.getElementById('cloudLastSyncTime');
     if (timeEl) {
       const last = this.getLastSyncTime();
-      timeEl.textContent = last ? `Последняя синхронизация: ${last}` : 'Ещё не выполнялась';
+      timeEl.textContent = last ? `Последняя синхронизация: ${last}` : 'Автоматически при действиях';
     }
 
     if (!dbUrl) {
       this.setStatus('local', 'Локально');
     } else {
-      this.setStatus('synced', 'Подключено');
+      this.setStatus('synced', 'Облако подключено');
     }
   },
 
