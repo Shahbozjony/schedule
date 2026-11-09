@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=46">
+  <link rel="stylesheet" href="style.css?v=47">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -986,6 +986,96 @@
           </button>
         </div>
 
+        <!-- CLOUD SYNC & CROSS-DEVICE DATA TRANSFER -->
+        <div class="section-card cloud-sync-card" style="margin-bottom: 12px; padding: 14px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8)); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 22px;">☁️</span>
+              <div>
+                <h4 style="font-size: 15px; font-weight: 700; color: #f8fafc;">Синхронизация с ноутбуком</h4>
+                <div style="font-size: 11px; color: var(--text-dim);" id="cloudLastSyncTime">Ещё не выполнялась</div>
+              </div>
+            </div>
+            <span id="cloudSyncStatusBadge" class="cloud-sync-status-badge status-local">
+              <span class="status-dot"></span> Локально
+            </span>
+          </div>
+
+          <!-- Fast Transfer Buttons (Zero config, immediate sync between phone & laptop) -->
+          <div style="background: rgba(0,0,0,0.25); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px;">
+            <div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+              <span>📲</span> Быстрый перенос (Телефон ⇄ Ноутбук)
+            </div>
+            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.4;">
+              Нажмите <b>«Скопировать код»</b> на телефоне, затем на ноутбуке нажмите <b>«Вставить код»</b> — и всё расписание с тренировками мгновенно появится на ноутбуке!
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button type="button" class="primary-btn" onclick="copySyncTransferCode()" style="padding: 9px 8px; font-size: 12px; justify-content: center; background: linear-gradient(135deg, #0284c7, #2563eb);">
+                📋 Скопировать код
+              </button>
+              <button type="button" class="secondary-btn" onclick="pasteSyncTransferCode()" style="padding: 9px 8px; font-size: 12px; justify-content: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #fff;">
+                📥 Вставить код
+              </button>
+            </div>
+          </div>
+
+          <!-- Realtime Cloud Auto-Sync Section (Firebase / Cloud DB) -->
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 700; color: #e2e8f0; display: flex; align-items: center; gap: 6px;">
+                <span>🌐</span> Автосинхронизация через Облако
+              </span>
+              <button type="button" class="link-btn-small" onclick="toggleCloudConfigBox()" style="font-size: 11px; color: #38bdf8; background: none; border: none; padding: 2px 6px; cursor: pointer;">
+                ⚙️ Настройки базы
+              </button>
+            </div>
+
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+              <button type="button" class="action-btn-row" onclick="CloudSync.syncNow()" style="flex: 1; padding: 9px 12px; font-size: 12px; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.3); color: #38bdf8; justify-content: center;">
+                🔄 Синхронизировать сейчас
+              </button>
+              <button type="button" class="action-btn-row" onclick="copyLaptopPairingLink()" title="Скопировать ссылку для ноутбука" style="padding: 9px 12px; font-size: 12px; background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: #e2e8f0; justify-content: center;">
+                🔗 Ссылка для ПК
+              </button>
+            </div>
+
+            <!-- Cloud DB Config Form (Collapsible) -->
+            <div id="cloudConfigBox" class="hidden" style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.35); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.1);">
+              <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">
+                URL базы данных (Firebase Realtime Database):
+              </label>
+              <input type="url" id="cloudDbUrlInput" placeholder="https://your-project-default-rtdb.firebaseio.com" style="width: 100%; padding: 8px 10px; font-size: 12px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #fff; margin-bottom: 8px;">
+              
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <span style="font-size: 11px; color: var(--text-dim);">Автосинхронизация при изменениях</span>
+                <label class="ios-switch" style="transform: scale(0.85); transform-origin: right center;">
+                  <input type="checkbox" id="cloudAutoSyncToggle" checked onchange="CloudSync.setAutoSync(this.checked)">
+                  <span class="ios-slider"></span>
+                </label>
+              </div>
+
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="primary-btn" onclick="saveCloudDbSettings()" style="flex: 1; padding: 7px 10px; font-size: 11px;">
+                  💾 Сохранить и подключить
+                </button>
+                <button type="button" class="link-btn-small" onclick="toggleCloudGuide()" style="font-size: 11px; color: #94a3b8; padding: 7px 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;">
+                  ❓ Инструкция
+                </button>
+              </div>
+
+              <!-- Collapsible Guide -->
+              <div id="cloudGuideBox" class="hidden" style="margin-top: 10px; padding: 8px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 11px; color: #cbd5e1; line-height: 1.5;">
+                <b>Как подключить постоянное облако (1 минута, 100% бесплатно):</b><br>
+                1. Откройте <a href="https://console.firebase.google.com" target="_blank" rel="noopener" style="color: #38bdf8; text-decoration: underline;">console.firebase.google.com</a> под вашим Google-аккаунтом.<br>
+                2. Нажмите <b>«Создать проект»</b> (назовите например <i>discipline-schedule</i>).<br>
+                3. В левом меню выберите <b>Realtime Database</b> → нажмите <b>«Создать базу данных»</b> → выберите <b>«Тестовый режим»</b>.<br>
+                4. Скопируйте ссылку (начинается с <code>https://...firebaseio.com</code>) и вставьте в поле выше.<br>
+                5. Нажмите <b>«Сохранить и подключить»</b> — теперь телефон и ноутбук будут синхронизироваться автоматически на лету!
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Account Actions -->
         <div class="section-card account-actions-card">
           <h3>Управление аккаунтом</h3>
@@ -1396,6 +1486,6 @@
 
   </div>
 
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=47"></script>
 </body>
 </html>
