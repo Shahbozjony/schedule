@@ -84,7 +84,9 @@ const DEFAULT_BOOKS = [
 document.addEventListener('DOMContentLoaded', () => {
   initLiveClock();
   initAchievements();
+  checkUrlSyncParams();
   initUserData();
+  if (window.CloudSync) window.CloudSync.init();
   registerServiceWorker();
 
   // Prevent any modal sheet from being horizontally shifted or trapped off-screen
@@ -538,6 +540,9 @@ function saveCurrentUser() {
   }
   checkAutomaticAchievements();
   updateTrophyTopBadge();
+  if (window.CloudSync) {
+    CloudSync.schedulePush();
+  }
 }
 
 function confirmResetData() {
@@ -677,6 +682,9 @@ function handleLoginSubmit(e) {
   localStorage.setItem(APP_SESSION_KEY, currentUser.username);
   localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
   showMainScreen();
+  if (window.CloudSync && CloudSync.getDbUrl()) {
+    CloudSync.pull(true);
+  }
 }
 
 function handleRegisterSubmit(e) {
@@ -1708,6 +1716,7 @@ function updateUserCoinsUI() {
 
 function openProfileModal() {
   renderUserProfile();
+  if (window.CloudSync) CloudSync.updateUI();
   document.getElementById('profileModal').classList.remove('hidden');
 }
 
@@ -8265,8 +8274,486 @@ function requestWebNotificationPermission() {
 }
 
 /* =========================================================
-   BACKUP & RESTORE
+   BACKUP & RESTORE, CROSS-DEVICE TRANSFER & CLOUD SYNC
    ========================================================= */
+
+function showSyncToast(message) {
+  let toast = document.getElementById('appSyncToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'appSyncToast';
+    toast.className = 'app-sync-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('visible');
+  if (toast._timer) clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => {
+    toast.classList.remove('visible');
+  }, 4500);
+}
+
+function utf8ToBase64(str) {
+  try {
+    return btoa(unescape(encodeURIComponent(str)));
+  } catch(e) {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+  }
+}
+
+function base64ToUtf8(b64) {
+  try {
+    return decodeURIComponent(escape(atob(b64)));
+  } catch(e) {
+    return decodeURIComponent(Array.prototype.map.call(atob(b64), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  }
+}
+
+function fallbackCopyTextToClipboard(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.top = '0';
+  textArea.style.left = '0';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch (err) {
+    success = false;
+  }
+  document.body.removeChild(textArea);
+  if (success) {
+    playHapticSound('targetAchieved');
+    showSyncToast('📋 Скопировано в буфер обмена!');
+  } else {
+    prompt('Скопируйте текст вручную (Ctrl+C или зажмите пальцем):', text);
+  }
+}
+
+function copySyncTransferCode() {
+  if (!currentUser) {
+    alert('Сначала войдите в систему.');
+    return;
+  }
+  try {
+    const jsonStr = JSON.stringify(currentUser);
+    const b64 = utf8ToBase64(jsonStr);
+    const transferCode = 'DISC_SYNC_' + b64;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(transferCode).then(() => {
+        playHapticSound('targetAchieved');
+        showSyncToast('📋 Код скопирован! Отправьте его себе (в Telegram/сообщение) и вставьте на ноутбуке.');
+      }).catch(() => {
+        fallbackCopyTextToClipboard(transferCode);
+      });
+    } else {
+      fallbackCopyTextToClipboard(transferCode);
+    }
+  } catch (err) {
+    alert('Не удалось сформировать код: ' + err.message);
+  }
+}
+
+function pasteSyncTransferCode() {
+  const code = prompt('Вставьте код переноса, скопированный с телефона (начинается с DISC_SYNC_...):');
+  if (!code || !code.trim()) return;
+
+  try {
+    let cleanCode = code.trim();
+    if (cleanCode.startsWith('DISC_SYNC_')) {
+      cleanCode = cleanCode.substring('DISC_SYNC_'.length);
+    }
+    const jsonStr = base64ToUtf8(cleanCode);
+    const importedData = JSON.parse(jsonStr);
+
+    if (importedData && importedData.username) {
+      const users = getAllUsers();
+      users[importedData.username.toLowerCase()] = importedData;
+      saveAllUsers(users);
+
+      currentUser = importedData;
+      localStorage.setItem(APP_SESSION_KEY, currentUser.username);
+      localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+      ensureUserDefaults();
+
+      renderSchedule();
+      renderPushups();
+      renderReadingTracker();
+      renderReport();
+      updateUserCoinsUI();
+      updateTrophyTopBadge();
+      renderUserProfile();
+
+      if (window.CloudSync && CloudSync.getDbUrl()) {
+        CloudSync.push();
+      }
+
+      playHapticSound('targetAchieved');
+      showSyncToast('🎉 Данные успешно перенесены на ноутбук!');
+      closeProfileModal();
+      showMainScreen();
+    } else {
+      alert('Ошибка: Некорректный формат данных в коде синхронизации.');
+    }
+  } catch (err) {
+    console.error('Error importing transfer code:', err);
+    alert('Не удалось применить код синхронизации: неверный или поврежденный код.');
+  }
+}
+
+function copyLaptopPairingLink() {
+  const dbUrl = window.CloudSync ? CloudSync.getDbUrl() : '';
+  const username = currentUser ? currentUser.username : 'shahbozjony';
+  const baseUrl = window.location.origin + window.location.pathname;
+
+  let link = baseUrl;
+  if (dbUrl) {
+    link += `?sync_db=${encodeURIComponent(dbUrl)}&user=${encodeURIComponent(username)}`;
+  } else if (currentUser) {
+    try {
+      const jsonStr = JSON.stringify(currentUser);
+      const b64 = utf8ToBase64(jsonStr);
+      link += `?import_code=${encodeURIComponent(b64)}`;
+    } catch(e) {
+      link += `?user=${encodeURIComponent(username)}`;
+    }
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(() => {
+      playHapticSound('targetAchieved');
+      showSyncToast('🔗 Ссылка для ноутбука скопирована! Откройте её в браузере на ноутбуке.');
+    }).catch(() => fallbackCopyTextToClipboard(link));
+  } else {
+    fallbackCopyTextToClipboard(link);
+  }
+}
+
+function toggleCloudConfigBox() {
+  const box = document.getElementById('cloudConfigBox');
+  if (box) box.classList.toggle('hidden');
+}
+
+function toggleCloudGuide() {
+  const guide = document.getElementById('cloudGuideBox');
+  if (guide) guide.classList.toggle('hidden');
+}
+
+function saveCloudDbSettings() {
+  const input = document.getElementById('cloudDbUrlInput');
+  const url = input ? input.value.trim() : '';
+
+  if (!url) {
+    if (window.CloudSync) {
+      CloudSync.setDbUrl('');
+      CloudSync.updateUI();
+    }
+    showSyncToast('URL базы очищен. Включен локальный режим.');
+    return;
+  }
+
+  if (!url.startsWith('https://')) {
+    alert('URL базы данных должен начинаться с https://');
+    return;
+  }
+
+  if (window.CloudSync) {
+    CloudSync.setDbUrl(url);
+    CloudSync.updateUI();
+    showSyncToast('Подключение к облаку...');
+
+    CloudSync.push().then(success => {
+      if (success) {
+        playHapticSound('targetAchieved');
+        showSyncToast('🟢 Успешно подключено к облачной базе!');
+      } else {
+        showSyncToast('⚠️ Не удалось подключиться к базе. Проверьте адрес и правила доступа (в тестовом режиме разрешите read и write).');
+      }
+    });
+  }
+}
+
+function checkUrlSyncParams() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    let urlChanged = false;
+
+    // 1. Sync DB URL parameter
+    const syncDbParam = urlParams.get('sync_db');
+    if (syncDbParam) {
+      localStorage.setItem('discipline_cloud_db_url', syncDbParam.trim().replace(/\/+$/, ''));
+      urlChanged = true;
+    }
+
+    // 2. Direct Import Code parameter
+    const importCodeParam = urlParams.get('import_code');
+    if (importCodeParam) {
+      try {
+        const jsonStr = base64ToUtf8(importCodeParam);
+        const importedData = JSON.parse(jsonStr);
+        if (importedData && importedData.username) {
+          const users = getAllUsers();
+          users[importedData.username.toLowerCase()] = importedData;
+          saveAllUsers(users);
+
+          currentUser = importedData;
+          localStorage.setItem(APP_SESSION_KEY, currentUser.username);
+          localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+          ensureUserDefaults();
+          showSyncToast('🎉 Данные успешно импортированы на это устройство!');
+        }
+      } catch (e) {
+        console.warn('Failed to parse import_code param:', e);
+      }
+      urlChanged = true;
+    }
+
+    // 3. User login switch parameter
+    const userParam = urlParams.get('user');
+    if (userParam && !currentUser) {
+      const users = getAllUsers();
+      if (users[userParam.toLowerCase()]) {
+        currentUser = users[userParam.toLowerCase()];
+        localStorage.setItem(APP_SESSION_KEY, currentUser.username);
+        localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+      }
+    }
+
+    if (urlChanged && window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  } catch (err) {
+    console.warn('checkUrlSyncParams error:', err);
+  }
+}
+
+/* =========================================================
+   CLOUD SYNC ENGINE (FIREBASE RTDB / REST KV)
+   ========================================================= */
+
+const CloudSync = {
+  getDbUrl() {
+    return (localStorage.getItem('discipline_cloud_db_url') || '').trim().replace(/\/+$/, '');
+  },
+
+  setDbUrl(url) {
+    if (url) localStorage.setItem('discipline_cloud_db_url', url.trim().replace(/\/+$/, ''));
+    else localStorage.removeItem('discipline_cloud_db_url');
+  },
+
+  isAutoSyncEnabled() {
+    const val = localStorage.getItem('discipline_cloud_autosync');
+    return val === null ? true : val === 'true';
+  },
+
+  setAutoSync(enabled) {
+    localStorage.setItem('discipline_cloud_autosync', enabled ? 'true' : 'false');
+  },
+
+  getLastSyncTime() {
+    return localStorage.getItem('discipline_cloud_last_sync') || null;
+  },
+
+  setLastSyncTime() {
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    localStorage.setItem('discipline_cloud_last_sync', now);
+    this.updateUI();
+  },
+
+  _syncTimeout: null,
+
+  schedulePush() {
+    if (!this.isAutoSyncEnabled()) return;
+    const dbUrl = this.getDbUrl();
+    if (!dbUrl || !currentUser || !currentUser.username) return;
+
+    if (this._syncTimeout) clearTimeout(this._syncTimeout);
+    this._syncTimeout = setTimeout(() => {
+      this.push();
+    }, 1500);
+  },
+
+  async push() {
+    const dbUrl = this.getDbUrl();
+    if (!dbUrl || !currentUser || !currentUser.username) return false;
+    this.setStatus('syncing', 'Синхронизация...');
+
+    try {
+      let endpoint = dbUrl;
+      if (!endpoint.endsWith('.json')) {
+        endpoint = `${dbUrl}/users/${encodeURIComponent(currentUser.username.toLowerCase())}.json`;
+      }
+
+      const payload = {
+        updatedAt: Date.now(),
+        user: currentUser
+      };
+
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      this.setLastSyncTime();
+      this.setStatus('synced', 'Синхронизировано');
+      return true;
+    } catch (err) {
+      console.warn('CloudSync push failed:', err);
+      this.setStatus('error', 'Ошибка связи');
+      return false;
+    }
+  },
+
+  async pull(silent = false) {
+    const dbUrl = this.getDbUrl();
+    if (!dbUrl) {
+      this.setStatus('local', 'Локально');
+      return false;
+    }
+
+    const username = currentUser ? currentUser.username : (localStorage.getItem(APP_SESSION_KEY) || 'shahbozjony');
+    if (!username) return false;
+
+    if (!silent) this.setStatus('syncing', 'Загрузка...');
+
+    try {
+      let endpoint = dbUrl;
+      if (!endpoint.endsWith('.json')) {
+        endpoint = `${dbUrl}/users/${encodeURIComponent(username.toLowerCase())}.json`;
+      }
+
+      const res = await fetch(endpoint, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-cache'
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const cloudData = await res.json();
+
+      if (!cloudData) {
+        if (currentUser) {
+          await this.push();
+        }
+        return true;
+      }
+
+      const remoteUser = cloudData.user || cloudData;
+      if (!remoteUser || !remoteUser.username) return false;
+
+      // Update local storage and current user
+      const users = getAllUsers();
+      users[remoteUser.username.toLowerCase()] = remoteUser;
+      saveAllUsers(users);
+
+      currentUser = remoteUser;
+      localStorage.setItem(APP_SESSION_KEY, currentUser.username);
+      localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+      ensureUserDefaults();
+
+      renderSchedule();
+      renderPushups();
+      renderReadingTracker();
+      renderReport();
+      updateUserCoinsUI();
+      updateTrophyTopBadge();
+      renderUserProfile();
+
+      this.setLastSyncTime();
+      this.setStatus('synced', 'Синхронизировано');
+      return true;
+    } catch (err) {
+      console.warn('CloudSync pull failed:', err);
+      if (!silent) this.setStatus('error', 'Ошибка связи');
+      return false;
+    }
+  },
+
+  async syncNow() {
+    const dbUrl = this.getDbUrl();
+    if (!dbUrl) {
+      alert('Облачная база ещё не настроена.\n\nНажмите «⚙️ Настройки базы» и вставьте ссылку на бесплатную базу Firebase Realtime Database (или воспользуйтесь кнопкой «Скопировать код» выше для мгновенного переноса на ноутбук).');
+      return;
+    }
+
+    this.setStatus('syncing', 'Синхронизация...');
+    showSyncToast('🔄 Обмен данными с облаком...');
+
+    const pullSuccess = await this.pull();
+    if (pullSuccess) {
+      await this.push();
+      playHapticSound('targetAchieved');
+      showSyncToast('🟢 Синхронизация с облаком успешно завершена!');
+    } else {
+      const pushSuccess = await this.push();
+      if (pushSuccess) {
+        showSyncToast('🟢 Данные выгружены в облако!');
+      } else {
+        showSyncToast('⚠️ Ошибка соединения с облаком. Проверьте интернет и адрес базы.');
+      }
+    }
+  },
+
+  setStatus(state, text) {
+    const badge = document.getElementById('cloudSyncStatusBadge');
+    if (badge) {
+      badge.className = `cloud-sync-status-badge status-${state}`;
+      badge.innerHTML = `<span class="status-dot"></span> ${text}`;
+    }
+  },
+
+  updateUI() {
+    const dbUrl = this.getDbUrl();
+    const urlInput = document.getElementById('cloudDbUrlInput');
+    if (urlInput && urlInput.value !== dbUrl) urlInput.value = dbUrl;
+
+    const toggle = document.getElementById('cloudAutoSyncToggle');
+    if (toggle) toggle.checked = this.isAutoSyncEnabled();
+
+    const timeEl = document.getElementById('cloudLastSyncTime');
+    if (timeEl) {
+      const last = this.getLastSyncTime();
+      timeEl.textContent = last ? `Последняя синхронизация: ${last}` : 'Ещё не выполнялась';
+    }
+
+    if (!dbUrl) {
+      this.setStatus('local', 'Локально');
+    } else {
+      this.setStatus('synced', 'Подключено');
+    }
+  },
+
+  init() {
+    this.updateUI();
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.getDbUrl()) {
+        this.pull(true);
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      if (this.getDbUrl()) this.pull(true);
+    });
+
+    window.addEventListener('online', () => {
+      if (this.getDbUrl()) this.push();
+    });
+
+    if (this.getDbUrl()) {
+      this.pull(true);
+    }
+  }
+};
+
+window.CloudSync = CloudSync;
 
 function exportDataBackup() {
   if (!currentUser) return;
@@ -8303,20 +8790,37 @@ function importDataBackup(event) {
   reader.onload = function(e) {
     try {
       const importedData = JSON.parse(e.target.result);
-      if (importedData && importedData.username && importedData.scheduleSlots) {
+      if (importedData && importedData.username) {
         const users = getAllUsers();
-        users[importedData.username] = importedData;
+        users[importedData.username.toLowerCase()] = importedData;
         saveAllUsers(users);
+
         currentUser = importedData;
-        localStorage.setItem(CURRENT_USER_KEY, importedData.username);
-        alert('Данные успешно восстановлены!');
+        localStorage.setItem(APP_SESSION_KEY, currentUser.username);
+        localStorage.setItem(APP_DATA_KEY, JSON.stringify(currentUser));
+        ensureUserDefaults();
+
+        renderSchedule();
+        renderPushups();
+        renderReadingTracker();
+        renderReport();
+        updateUserCoinsUI();
+        updateTrophyTopBadge();
+        renderUserProfile();
+
+        if (window.CloudSync && CloudSync.getDbUrl()) {
+          CloudSync.push();
+        }
+
+        playHapticSound('targetAchieved');
+        showSyncToast('Данные успешно восстановлены из файла бэкапа!');
         closeProfileModal();
         showMainScreen();
       } else {
-        alert('Неверный формат файла резервной копии.');
+        alert('Неверный формат файла резервной копии: отсутствуют данные пользователя.');
       }
     } catch (err) {
-      alert('Ошибка при чтении файла.');
+      alert('Ошибка при чтении файла резервной копии: ' + err.message);
     }
   };
   reader.readAsText(file);
