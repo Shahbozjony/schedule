@@ -2416,6 +2416,7 @@ function openAddSlotModal() {
   document.getElementById('slotEnd').value = '11:00';
   document.getElementById('slotPenalty').value = '5000';
   populateCategorySelect('work');
+  updateSlotExerciseSectionHeader('work');
 
   const recEl = document.getElementById('slotRecurrenceType');
   const viewDateKey = getScheduleViewDateKey();
@@ -2459,6 +2460,7 @@ function openEditSlotModal(slotId) {
   document.getElementById('slotEnd').value = slot.end;
   document.getElementById('slotPenalty').value = slot.penalty !== undefined ? slot.penalty : 5000;
   populateCategorySelect(slot.category || 'work');
+  updateSlotExerciseSectionHeader(slot.category || 'work');
 
   const recEl = document.getElementById('slotRecurrenceType');
   if (recEl) {
@@ -2523,57 +2525,193 @@ function updateSlotExercisesHeaderVisibility() {
   }
 }
 
-function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз') {
-  const container = document.getElementById('slotExercisesContainer');
-  const row = document.createElement('div');
-  row.className = 'slot-ex-row slot-ex-card';
+function onSlotCategoryChanged(selectEl) {
+  const catId = selectEl ? selectEl.value : (document.getElementById('slotCategory') ? document.getElementById('slotCategory').value : 'work');
+  updateSlotExerciseSectionHeader(catId);
+  updateAllSlotExerciseDropdowns();
+}
 
-  const userExercises = (currentUser && currentUser.exercises) || DEFAULT_EXERCISES;
-  const userStudy = (currentUser && currentUser.studyActivities) || DEFAULT_STUDY_ACTIVITIES;
+function updateSlotExerciseSectionHeader(catId) {
+  const labelEl = document.getElementById('slotExSectionLabel');
+  const emptyHintEl = document.getElementById('slotExEmptyHint');
+  const btnInBase = document.getElementById('slotBtnAddToBase');
+  if (!catId && document.getElementById('slotCategory')) {
+    catId = document.getElementById('slotCategory').value;
+  }
+  const catIdLower = (catId || '').toLowerCase();
+  const isSport = catIdLower === 'sport' || catIdLower.includes('спорт') || catIdLower.includes('трениров');
+  const isWork = catIdLower === 'work' || catIdLower.includes('учеб') || catIdLower.includes('работ');
 
+  if (labelEl) {
+    if (isSport) labelEl.textContent = 'Упражнения и спорт-нормативы';
+    else if (isWork) labelEl.textContent = 'Задачи учёбы, книги и ACCA';
+    else labelEl.textContent = 'Дела и нормативы блока';
+  }
+
+  if (emptyHintEl) {
+    if (isSport) {
+      emptyHintEl.textContent = 'К этому блоку не привязаны спортивные упражнения. Нажмите «+ Добавить», чтобы выбрать упражнение из базы.';
+    } else if (isWork) {
+      emptyHintEl.textContent = 'К этому блоку не привязаны задачи или книги. Нажмите «+ Добавить», чтобы привязать ACCA, книгу или сессию.';
+    } else {
+      emptyHintEl.textContent = 'К этому блоку не привязаны задачи. Нажмите «+ Добавить», чтобы указать дело и норму.';
+    }
+  }
+
+  if (btnInBase) {
+    if (isSport) btnInBase.textContent = '+ В спорт-базу';
+    else if (isWork) btnInBase.textContent = '+ В базу учёбы';
+    else btnInBase.textContent = '+ В базу';
+  }
+}
+
+function buildExerciseOptionsForCategory(catId, selectedName = '') {
   let optionsHtml = `<option value="">-- Выберите дело/упражнение --</option>`;
   let matched = false;
 
+  const userExercises = (currentUser && currentUser.exercises) || DEFAULT_EXERCISES;
+  const userStudy = (currentUser && currentUser.studyActivities) || DEFAULT_STUDY_ACTIVITIES;
   const userBooks = (currentUser && currentUser.books) || DEFAULT_BOOKS;
-  if (userBooks.length > 0) {
-    optionsHtml += `<optgroup label="📖 Мои книги">`;
+  const userCustom = (currentUser && currentUser.customActivities) || [];
+
+  const catIdLower = (catId || '').toLowerCase();
+  const isSport = catIdLower === 'sport' || catIdLower.includes('спорт') || catIdLower.includes('трениров');
+  const isWorkOrStudy = catIdLower === 'work' || catIdLower.includes('учеб') || catIdLower.includes('работ') || catIdLower.includes('acca');
+
+  if (isSport) {
+    // ONLY sport exercises
+    optionsHtml += `<optgroup label="🏋️ Упражнения и спорт">`;
+    userExercises.forEach(ex => {
+      const isSelected = ex.name === selectedName;
+      if (isSelected) matched = true;
+      optionsHtml += `<option value="${escapeHtml(ex.name)}" data-kind="sport" ${isSelected ? 'selected' : ''}>${ex.icon || '🏋️'} ${escapeHtml(ex.name)}</option>`;
+    });
+    optionsHtml += `</optgroup>`;
+
+    const sportCustom = userCustom.filter(c => c.category === 'sport');
+    if (sportCustom.length > 0) {
+      optionsHtml += `<optgroup label="⚡ Мои нормативы спорта">`;
+      sportCustom.forEach(c => {
+        const isSelected = c.name === selectedName;
+        if (isSelected) matched = true;
+        optionsHtml += `<option value="${escapeHtml(c.name)}" data-kind="sport" ${isSelected ? 'selected' : ''}>${c.icon || '🥊'} ${escapeHtml(c.name)}</option>`;
+      });
+      optionsHtml += `</optgroup>`;
+    }
+
+    if (selectedName && !matched) {
+      optionsHtml += `<option value="${escapeHtml(selectedName)}" selected>✏️ ${escapeHtml(selectedName)}</option>`;
+    }
+    optionsHtml += `<option value="__new__">➕ Новое упражнение в базу...</option>`;
+    optionsHtml += `<option value="__custom__">✏️ Ввести другое вручную...</option>`;
+    return optionsHtml;
+  }
+
+  if (isWorkOrStudy) {
+    // ONLY work / study and books
+    if (userBooks.length > 0) {
+      optionsHtml += `<optgroup label="📖 Мои книги и Study Text">`;
+      userBooks.forEach(b => {
+        const isSelected = b.title === selectedName;
+        if (isSelected) matched = true;
+        optionsHtml += `<option value="${escapeHtml(b.title)}" data-kind="book" ${isSelected ? 'selected' : ''}>📖 ${escapeHtml(b.title)}</option>`;
+      });
+      optionsHtml += `</optgroup>`;
+    }
+
+    optionsHtml += `<optgroup label="📚 Учёба, ACCA и задачи">`;
+    userStudy.forEach(st => {
+      const isSelected = st.name === selectedName;
+      if (isSelected) matched = true;
+      optionsHtml += `<option value="${escapeHtml(st.name)}" data-kind="study" ${isSelected ? 'selected' : ''}>${st.icon || '📚'} ${escapeHtml(st.name)}</option>`;
+    });
+    optionsHtml += `</optgroup>`;
+
+    const workCustom = userCustom.filter(c => c.category === 'work');
+    if (workCustom.length > 0) {
+      optionsHtml += `<optgroup label="💼 Мои дела работы/учёбы">`;
+      workCustom.forEach(c => {
+        const isSelected = c.name === selectedName;
+        if (isSelected) matched = true;
+        optionsHtml += `<option value="${escapeHtml(c.name)}" data-kind="study" ${isSelected ? 'selected' : ''}>${c.icon || '💼'} ${escapeHtml(c.name)}</option>`;
+      });
+      optionsHtml += `</optgroup>`;
+    }
+
+    if (selectedName && !matched) {
+      optionsHtml += `<option value="${escapeHtml(selectedName)}" selected>✏️ ${escapeHtml(selectedName)}</option>`;
+    }
+    optionsHtml += `<option value="__new__">➕ Новое дело в базу учёты...</option>`;
+    optionsHtml += `<option value="__custom__">✏️ Ввести другое вручную...</option>`;
+    return optionsHtml;
+  }
+
+  // Any other category
+  const catCustom = userCustom.filter(c => c.category === catId);
+  if (catCustom.length > 0) {
+    const cat = getCategory(catId);
+    optionsHtml += `<optgroup label="${cat.emoji || '📌'} Дела категории «${escapeHtml(cat.name)}»">`;
+    catCustom.forEach(c => {
+      const isSelected = c.name === selectedName;
+      if (isSelected) matched = true;
+      optionsHtml += `<option value="${escapeHtml(c.name)}" data-kind="custom" ${isSelected ? 'selected' : ''}>${c.icon || cat.emoji || '📌'} ${escapeHtml(c.name)}</option>`;
+    });
+    optionsHtml += `</optgroup>`;
+  }
+
+  if (catIdLower === 'rest' && userBooks.length > 0) {
+    optionsHtml += `<optgroup label="📖 Книги для отдыха">`;
     userBooks.forEach(b => {
-      const isSelected = b.title === name;
+      const isSelected = b.title === selectedName;
       if (isSelected) matched = true;
       optionsHtml += `<option value="${escapeHtml(b.title)}" data-kind="book" ${isSelected ? 'selected' : ''}>📖 ${escapeHtml(b.title)}</option>`;
     });
     optionsHtml += `</optgroup>`;
   }
 
-  optionsHtml += `<optgroup label="📚 Учёба и чтение">`;
-  userStudy.forEach(st => {
-    const isSelected = st.name === name;
-    if (isSelected) matched = true;
-    optionsHtml += `<option value="${escapeHtml(st.name)}" data-kind="study" ${isSelected ? 'selected' : ''}>${st.icon || '📚'} ${escapeHtml(st.name)}</option>`;
-  });
-  optionsHtml += `</optgroup>`;
-
-  optionsHtml += `<optgroup label="💪 Тренировка и спорт">`;
-  userExercises.forEach(ex => {
-    const isSelected = ex.name === name;
-    if (isSelected) matched = true;
-    optionsHtml += `<option value="${escapeHtml(ex.name)}" data-kind="sport" ${isSelected ? 'selected' : ''}>${ex.icon || '🏋️'} ${escapeHtml(ex.name)}</option>`;
-  });
-  optionsHtml += `</optgroup>`;
-
-  if (name && !matched) {
-    optionsHtml += `<option value="${escapeHtml(name)}" selected>✏️ ${escapeHtml(name)}</option>`;
+  if (selectedName && !matched) {
+    optionsHtml += `<option value="${escapeHtml(selectedName)}" selected>✏️ ${escapeHtml(selectedName)}</option>`;
   }
 
-  optionsHtml += `<option value="__new__">➕ Новое упражнение/предмет...</option>`;
+  optionsHtml += `<option value="__new__">➕ Добавить дело в эту категорию...</option>`;
   optionsHtml += `<option value="__custom__">✏️ Ввести другое вручную...</option>`;
+  return optionsHtml;
+}
+
+function updateAllSlotExerciseDropdowns(selectedValForTarget, targetSelectEl) {
+  const catSelect = document.getElementById('slotCategory');
+  const catId = catSelect ? catSelect.value : 'work';
+  const rows = document.querySelectorAll('#slotExercisesContainer .slot-ex-row');
+  rows.forEach(r => {
+    const select = r.querySelector('.ex-name-select');
+    if (!select) return;
+    const currentVal = (select === targetSelectEl && selectedValForTarget) ? selectedValForTarget : select.value;
+    select.innerHTML = buildExerciseOptionsForCategory(catId, currentVal);
+    select.value = currentVal;
+  });
+}
+
+function addExerciseFieldToSlot(name = '', sets = null, target = null, unit = null) {
+  const container = document.getElementById('slotExercisesContainer');
+  const catSelect = document.getElementById('slotCategory');
+  const catId = catSelect ? catSelect.value : 'work';
+  const isSport = catId === 'sport' || catId.includes('спорт') || catId.includes('трениров');
+
+  if (sets === null || sets === undefined) sets = isSport ? 3 : 1;
+  if (target === null || target === undefined) target = isSport ? 20 : 10;
+  if (unit === null || unit === undefined) unit = isSport ? 'раз' : 'задач';
+
+  const row = document.createElement('div');
+  row.className = 'slot-ex-row slot-ex-card';
+
+  const optionsHtml = buildExerciseOptionsForCategory(catId, name);
 
   row.innerHTML = `
     <div class="slot-ex-card-top">
-      <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите упражнение или предмет из базы" aria-label="Упражнение">
+      <select class="ex-name-select" onchange="onSlotExerciseSelectChanged(this)" title="Выберите дело или упражнение из базы" aria-label="Дело/упражнение">
         ${optionsHtml}
       </select>
-      <button type="button" class="slot-ex-delete-btn" onclick="removeSlotExerciseRow(this)" title="Удалить это упражнение" aria-label="Удалить">✕</button>
+      <button type="button" class="slot-ex-delete-btn" onclick="removeSlotExerciseRow(this)" title="Удалить эту строку" aria-label="Удалить">✕</button>
     </div>
     <div class="slot-ex-card-bottom">
       <div class="slot-ex-metric-col">
@@ -2582,7 +2720,7 @@ function addExerciseFieldToSlot(name = '', sets = 3, target = 20, unit = 'раз
       </div>
       <div class="slot-ex-metric-col">
         <label class="slot-ex-metric-label">РАЗ / НОРМА</label>
-        <input type="number" placeholder="25" min="1" max="5000" value="${target}" title="Целевое количество (норма повторений, страниц или минут)" aria-label="Норма" class="ex-target-input">
+        <input type="number" placeholder="25" min="1" max="5000" value="${target}" title="Целевое количество (норма повторений, страниц или задач)" aria-label="Норма" class="ex-target-input">
       </div>
       <div class="slot-ex-metric-col">
         <label class="slot-ex-metric-label">ЕДИНИЦА</label>
@@ -2608,7 +2746,7 @@ function onSlotExerciseSelectChanged(selectEl) {
   if (!row) return;
 
   if (val === '__custom__') {
-    const customName = prompt('Введите название упражнения или предмета:');
+    const customName = prompt('Введите название дела или упражнения:');
     if (customName && customName.trim()) {
       const opt = document.createElement('option');
       opt.value = customName.trim();
@@ -2622,25 +2760,21 @@ function onSlotExerciseSelectChanged(selectEl) {
   }
 
   if (val === '__new__') {
-    const newName = prompt('Добавить в базу.\n\nВведите название (например: ACCA: Налоги или Жим гантелей):');
+    const catSelect = document.getElementById('slotCategory');
+    const catId = catSelect ? catSelect.value : 'work';
+    const isSport = catId === 'sport' || catId.includes('спорт') || catId.includes('трениров');
+    const isWork = catId === 'work' || catId.includes('учеб') || catId.includes('работ');
+
+    const promptMsg = isSport
+      ? 'Добавить новое упражнение в спорт-базу:\n\nВведите название (например: Жим гантелей, Приседания):'
+      : (isWork 
+          ? 'Добавить новое дело в базу учёбы/ACCA:\n\nВведите название (например: ACCA: Налоги или Чтение конспектов):'
+          : 'Добавить дело в эту категорию:\n\nВведите название:');
+
+    const newName = prompt(promptMsg);
     if (newName && newName.trim()) {
       const trimmedName = newName.trim();
-      const isStudy = trimmedName.toLowerCase().includes('acca') || trimmedName.toLowerCase().includes('чтени') || trimmedName.toLowerCase().includes('книг') || trimmedName.toLowerCase().includes('учеб');
-      if (isStudy) {
-        const newSt = {
-          id: 'study_' + Date.now(),
-          name: trimmedName,
-          icon: trimmedName.toLowerCase().includes('книг') || trimmedName.toLowerCase().includes('чтен') ? '📖' : '📑',
-          type: 'reps',
-          unit: trimmedName.toLowerCase().includes('книг') || trimmedName.toLowerCase().includes('чтен') ? 'стр' : 'задач',
-          target: 20,
-          days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-        };
-        if (!currentUser.studyActivities) currentUser.studyActivities = [];
-        currentUser.studyActivities.push(newSt);
-        saveCurrentUser();
-        renderStudy();
-      } else {
+      if (isSport) {
         const isPlank = trimmedName.toLowerCase().includes('планк') || trimmedName.toLowerCase().includes('удержан');
         const newEx = {
           id: 'ex_' + Date.now(),
@@ -2654,14 +2788,35 @@ function onSlotExerciseSelectChanged(selectEl) {
         currentUser.exercises.push(newEx);
         saveCurrentUser();
         renderPushups();
+      } else if (isWork) {
+        const isBook = trimmedName.toLowerCase().includes('книг') || trimmedName.toLowerCase().includes('study text');
+        const newSt = {
+          id: 'study_' + Date.now(),
+          name: trimmedName,
+          icon: isBook ? '📖' : '📑',
+          type: 'reps',
+          unit: isBook ? 'стр' : 'задач',
+          target: isBook ? 20 : 10,
+          days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        };
+        if (!currentUser.studyActivities) currentUser.studyActivities = [];
+        currentUser.studyActivities.push(newSt);
+        saveCurrentUser();
+        renderStudy();
+      } else {
+        if (!currentUser.customActivities) currentUser.customActivities = [];
+        currentUser.customActivities.push({
+          id: 'act_' + Date.now(),
+          name: trimmedName,
+          category: catId,
+          icon: '📌'
+        });
+        saveCurrentUser();
       }
       renderReport();
 
-      const opt = document.createElement('option');
-      opt.value = trimmedName;
-      opt.textContent = (isStudy ? '📚 ' : '🏋️ ') + trimmedName;
-      opt.selected = true;
-      selectEl.insertBefore(opt, selectEl.lastElementChild.previousElementSibling);
+      updateAllSlotExerciseDropdowns(trimmedName, selectEl);
+      onSlotExerciseSelectChanged(selectEl);
     } else {
       selectEl.value = '';
     }
@@ -3194,7 +3349,50 @@ function openAddExerciseModal() {
 }
 
 function openExerciseModal() {
-  openAddExerciseModal();
+  const catSelect = document.getElementById('slotCategory');
+  const catId = catSelect ? catSelect.value : 'work';
+  const catIdLower = (catId || '').toLowerCase();
+  const isSport = catIdLower === 'sport' || catIdLower.includes('спорт') || catIdLower.includes('трениров');
+  const isWork = catIdLower === 'work' || catIdLower.includes('учеб') || catIdLower.includes('работ');
+
+  if (isSport) {
+    openAddExerciseModal();
+  } else {
+    const promptMsg = isWork
+      ? 'Добавить новое дело в базу учёбы и работы:\n\nВведите название (например: ACCA: Налоги, Чтение конспектов):'
+      : 'Добавить дело в эту категорию:\n\nВведите название:';
+    const newName = prompt(promptMsg);
+    if (newName && newName.trim()) {
+      const trimmed = newName.trim();
+      if (isWork) {
+        const isBook = trimmed.toLowerCase().includes('книг') || trimmed.toLowerCase().includes('study text');
+        const newSt = {
+          id: 'study_' + Date.now(),
+          name: trimmed,
+          icon: isBook ? '📖' : '📑',
+          type: 'reps',
+          unit: isBook ? 'стр' : 'задач',
+          target: isBook ? 20 : 10,
+          days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        };
+        if (!currentUser.studyActivities) currentUser.studyActivities = [];
+        currentUser.studyActivities.push(newSt);
+        saveCurrentUser();
+        renderStudy();
+      } else {
+        if (!currentUser.customActivities) currentUser.customActivities = [];
+        currentUser.customActivities.push({
+          id: 'act_' + Date.now(),
+          name: trimmed,
+          category: catId,
+          icon: '📌'
+        });
+        saveCurrentUser();
+      }
+      renderReport();
+      addExerciseFieldToSlot(trimmed);
+    }
+  }
 }
 
 function closeExerciseModal() {
@@ -3242,6 +3440,13 @@ function saveCustomExercise(e) {
   closeExerciseModal();
   renderPushups();
   renderReport();
+
+  // If slot modal is open, also add into current block and refresh dropdowns
+  const slotModal = document.getElementById('slotModal');
+  if (slotModal && !slotModal.classList.contains('hidden')) {
+    updateAllSlotExerciseDropdowns();
+    addExerciseFieldToSlot(name, type === 'sets' ? target : 1, type === 'sets' ? 10 : target, type === 'sets' ? 'раз' : (isPlank ? 'сек' : 'раз'));
+  }
 }
 
 function deleteExercise(exId) {
