@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=27">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=27">
   
-  <link rel="stylesheet" href="style.css?v=45">
+  <link rel="stylesheet" href="style.css?v=46">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -711,7 +711,7 @@
               <label style="margin-bottom: 0;">Категория / Цвет</label>
               <button type="button" class="link-btn-small" onclick="openAddCategoryModal()">+ Новая категория</button>
             </div>
-            <select id="slotCategory">
+            <select id="slotCategory" onchange="onSlotCategoryChanged(this)">
               <!-- Dynamically populated from currentUser.categories -->
             </select>
           </div>
@@ -777,9 +777,9 @@
           <!-- Block Exercises & Targets Section (Отжимания, Планка и др.) -->
           <div class="slot-exercises-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 13px; font-weight: 700; color: #a5b4fc;">Упражнения и нормативы</span>
+              <span id="slotExSectionLabel" style="font-size: 13px; font-weight: 700; color: #a5b4fc;">Упражнения и нормативы</span>
               <div style="display: flex; gap: 6px;">
-                <button type="button" class="add-slot-btn" onclick="openExerciseModal()" style="padding: 4px 8px; font-size: 11px; background: rgba(99,102,241,0.2); border-color: #6366f1;">+ В базу</button>
+                <button type="button" id="slotBtnAddToBase" class="add-slot-btn" onclick="openExerciseModal()" style="padding: 4px 8px; font-size: 11px; background: rgba(99,102,241,0.2); border-color: #6366f1;">+ В базу</button>
                 <button type="button" class="add-slot-btn" onclick="addExerciseFieldToSlot()" style="padding: 4px 8px; font-size: 11px;">+ Добавить</button>
               </div>
             </div>
@@ -1396,6 +1396,6 @@
 
   </div>
 
-  <script src="app.js?v=45"></script>
+  <script src="app.js?v=46"></script>
 </body>
 </html>
